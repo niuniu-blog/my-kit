@@ -166,3 +166,5 @@
 10. `HostStatsReader` 缓存 `mach_host_self()`（避免每次调用泄漏一个端口引用），页大小用 `host_page_size`。
 11. `MonitorSettings` 的 setter 自己发变更通知；设置变化后模块立即重读一次总数。
 12. 菜单视图尺寸：宽 300pt，标题行 24pt，排行行 20pt，图标 16pt（`AppIconCache`，已测）。
+13. 装机后实测并优化了 MyKit 自身的空闲开销（用 `ps` 的累计 CPU 时间和 `sample` 定位）：优化前约 1.1%（单核），其中系统监控本身只占约 0.1%，其余来自原有的定时任务。两处改动：(a) 菜单栏标题内容（文字 + 颜色）没变时不再通知 `StatusBarController`，避免无谓的文字重排（已测）；(b) `AccessibilityWatcher` 改为自适应间隔 —— 未授权时每 1 秒检查，已授权后每 5 秒（`currentInterval`，已测）。优化后实测约 0.6%（单核），折合整机约 0.05%；常驻内存约 54 MB。
+14. 排查提示：单元测试里的假读取器会故意返回失败，测试进程（`swiftpm-testing-helper`）因此会以同一个日志分类写出"读取 CPU 统计失败"。查看 App 自己的日志要加 `process == "MyKit"` 过滤。

@@ -30,4 +30,24 @@ import Testing
         #expect(changes == [true, false])
         #expect(!watcher.isTrusted)
     }
+
+    @Test func pollsQuicklyWhileWaitingForPermissionAndSlowlyOnceTrusted() {
+        // 等用户授权时每秒查一次（授权后马上生效）；已经授权后只需偶尔确认没被撤销
+        var trusted = false
+        let watcher = AccessibilityWatcher(check: { trusted })
+        #expect(watcher.currentInterval == 1.0)
+
+        trusted = true
+        watcher.poll()
+        #expect(watcher.currentInterval == 5.0)
+
+        trusted = false
+        watcher.poll()
+        #expect(watcher.currentInterval == 1.0)
+    }
+
+    @Test func startsSlowWhenAlreadyTrusted() {
+        let watcher = AccessibilityWatcher(check: { true })
+        #expect(watcher.currentInterval == 5.0)
+    }
 }

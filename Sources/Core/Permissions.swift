@@ -60,32 +60,37 @@ public enum Permissions {
     }
 }
 
-/// 每秒检查一次辅助功能授权，变化时回调。用户在系统设置里勾选后无需重启 MyKit。
+/// 定期检查辅助功能授权，变化时回调。用户在系统设置里勾选后无需重启 MyKit。
+/// 等待授权时每秒查一次（勾选后马上生效）；已经授权后只需偶尔确认没被撤销，每 5 秒一次，省电。
 @MainActor
 public final class AccessibilityWatcher {
     public var onChange: ((Bool) -> Void)?
     public private(set) var isTrusted: Bool
 
+    public static let untrustedInterval: TimeInterval = 1.0
+    public static let trustedInterval: TimeInterval = 5.0
+
     private let check: () -> Bool
     private var timer: Timer?
+    private var isStarted = false
 
     public init(check: @escaping () -> Bool = { AXIsProcessTrusted() }) {
         self.check = check
         self.isTrusted = check()
     }
 
-    public func start(interval: TimeInterval = 1.0) {
-        stop()
-        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.poll()
-            }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+    /// 当前的检查间隔，取决于是否已经授权
+    public var currentInterval: TimeInterval {
+        isTrusted ? Self.trustedInterval : Self.untrustedInterval
+    }
+
+    public func start() {
+        isStarted = true
+        scheduleTimer()
     }
 
     public func stop() {
+        isStarted = false
         timer?.invalidate()
         timer = nil
     }
@@ -94,6 +99,20 @@ public final class AccessibilityWatcher {
         let current = check()
         guard current != isTrusted else { return }
         isTrusted = current
+        if isStarted { scheduleTimer() }     // 授权状态变了 → 换成对应的检查间隔
         onChange?(current)
+    }
+
+    private func scheduleTimer() {
+        timer?.invalidate()
+        let interval = currentInterval
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.poll()
+            }
+        }
+        timer.tolerance = interval / 5
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
     }
 }

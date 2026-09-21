@@ -143,6 +143,9 @@ public final class SystemMonitorModule: NSObject, AppModule {
         let title: NSAttributedString? = settings.showInMenuBar
             ? Self.attributedTitle(for: MonitorFormat.titleSegments(cpu: totals.cpu?.total, memory: totals.memory?.percent))
             : nil
+        // 内容（文字和颜色）没变就不通知：让菜单栏重新排版文字是平时最贵的一步
+        if let title, let current = currentMenuBarTitle, title.isEqual(to: current) { return }
+        if title == nil, currentMenuBarTitle == nil { return }
         currentMenuBarTitle = title
         onMenuBarTitleChange?(title)
     }

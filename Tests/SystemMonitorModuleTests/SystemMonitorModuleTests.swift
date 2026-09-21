@@ -101,7 +101,23 @@ private final class StubSampler: ProcessSampling, @unchecked Sendable {
 
         await module.engine.tick()
         #expect(module.currentMenuBarTitle?.string == " CPU 25%  内存 50%")
-        #expect(titles == [" CPU --  内存 50%", " CPU --  内存 50%", " CPU 25%  内存 50%"])
+        #expect(titles == [" CPU --  内存 50%", " CPU 25%  内存 50%"])       // 内容没变就不重复通知
+    }
+
+    @Test func unchangedTitleDoesNotRelayoutTheStatusItem() async throws {
+        // 数值没变时不应该再让菜单栏重新排版文字（那是平时最贵的一步）
+        let flat = [ticks(user: 0, system: 0, idle: 0), ticks(user: 20, system: 5, idle: 75), ticks(user: 40, system: 10, idle: 150)]
+        let module = makeModule(defaults: makeDefaults(), ticks: flat)
+        var notifications = 0
+        module.onMenuBarTitleChange = { _ in notifications += 1 }
+
+        try module.start()
+        await module.engine.tick()          // CPU 25%
+        let afterFirstValue = notifications
+        await module.engine.tick()          // 仍然是 25%
+        await module.engine.tick()
+
+        #expect(notifications == afterFirstValue)
     }
 
     @Test func headersShowTotalsWithDetails() async throws {
