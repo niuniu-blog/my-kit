@@ -31,6 +31,7 @@ MyKit 是一个 macOS 菜单栏常驻工具，定位是"集成很多小功能的
 
 - macOS 27，Swift 6.4，仅安装 Command Line Tools，**没有完整 Xcode**。
 - 因此：用 SwiftPM 构建、脚本组装 `.app`；测试框架用 Swift Testing（CLT 自带），不用 XCTest（CLT 不带）。
+- macOS 27 SDK 把 SwiftUI 的 `@State` 改成了宏，宏插件只随 Xcode 提供；代码里统一用别名 `@ViewState`（指向底层属性包装器 `SwiftUI.State`）绕开。
 - 本机当前没有任何代码签名证书。
 
 ## 2. 架构
@@ -41,10 +42,9 @@ MyKit 是一个 macOS 菜单栏常驻工具，定位是"集成很多小功能的
 
 | 菜单项 | 说明 |
 |---|---|
-| 打开剪切板 | 等同于双击 Option |
-| 暂停记录 / 恢复记录 | 勾选状态，暂停时图标变灰 |
+| 打开剪切板 | 等同于双击 Option（由剪切板模块通过 `AppModule.menuItems` 提供） |
+| 暂停记录 | 勾选状态，暂停时图标变灰（同样由剪切板模块提供） |
 | 偏好设置… | 打开设置窗口 |
-| 各模块自己的菜单项 | 由 `AppModule.menuItems` 提供，第一版为空 |
 | 退出 MyKit | 菜单最后一项，快捷键 ⌘Q，点击后立即退出（停止所有模块、关闭数据库） |
 
 实现上给 `NSStatusItem` 直接设置 `menu` 属性即可，系统默认对左右键都弹出该菜单，不需要单独处理右键事件。
@@ -197,7 +197,7 @@ CREATE VIRTUAL TABLE items_fts USING fts5(text, content='items', content_rowid='
 
 ### 待验证风险：剪切板隐私提示
 
-macOS 15.4 起系统引入了"App 在无用户操作时读取剪切板"的隐私机制（`NSPasteboard.accessBehavior`），较新系统上可能对后台读取弹出提示，需要用户在"隐私与安全性 → 从其他 App 粘贴"中将 MyKit 设为"始终允许"。实现阶段的第一步就在 macOS 27 上验证实际行为；如确有提示，则把这一步加入引导窗口，并在 Monitor 中检测 `accessBehavior` 给出状态提示。
+macOS 15.4 起系统引入了"App 在无用户操作时读取剪切板"的隐私机制（`NSPasteboard.accessBehavior`），较新系统上可能对后台读取弹出提示，需要用户在"隐私与安全性 → 从其他 App 粘贴"中将 MyKit 设为"始终允许"。引导窗口根据 `accessBehavior`（`.ask` / `.alwaysDeny`）决定是否显示"还需要允许 MyKit 读取剪切板"一节。签名后的 `.app` 第一次真实运行监听时（实现计划 Task 7 Step 7）在 macOS 27 上验证实际行为；如果 `.default` 下也会弹系统提示，则把 `.default` 一并视为需要用户批准。
 
 ## 6. 设置
 
@@ -211,9 +211,11 @@ macOS 15.4 起系统引入了"App 在无用户操作时读取剪切板"的隐私
 
 ## 7. 构建与签名
 
-- `scripts/build-app.sh`：`swift build -c release` → 组装 `build/MyKit.app`（`Contents/MacOS/MyKit`、`Info.plist`、`Resources/AppIcon.icns`）→ `codesign`。
-- `scripts/create-dev-cert.sh`：一次性在登录钥匙串中创建本地自签名代码签名证书 `MyKit Dev`。
+- `scripts/build-app.sh`：`swift build -c release --build-system native` → 组装 `build/MyKit.app`（`Contents/MacOS/MyKit`、`Info.plist`、`Resources/AppIcon.icns`）→ `codesign`。
+- `scripts/test.sh`：包装 `swift test`。已在本机验证：仅有 Command Line Tools 时，默认的 swiftbuild 构建系统无法初始化，必须用 `--build-system native`；且需要显式传入 Swift Testing 的框架路径、宏插件路径和 rpath，测试才能编译运行。
+- `scripts/create-dev-cert.sh`：一次性用 `openssl` 生成自签名代码签名证书 `MyKit Dev`，导入**专用钥匙串** `~/Library/Keychains/mykit-dev.keychain-db`（固定密码，不加入钥匙串搜索列表）。构建时用 `codesign --keychain` 指定它。已在本机验证：全程无需用户输入登录密码，签名后的 designated requirement 为 `identifier "com.imiros.mykit" and certificate leaf = H"…"`，重新编译后保持不变。
 - 必须使用固定证书签名：辅助功能授权绑定代码签名身份，ad-hoc 签名每次重新编译都会导致授权失效。证书不存在时构建脚本报错并提示先运行 `create-dev-cert.sh`。
+- `scripts/install.sh`：退出正在运行的 MyKit → 复制到 `/Applications/MyKit.app` → 重新打开。
 - 日后分享给他人：把签名身份换成 Apple Developer ID 并加 `notarytool` 公证步骤，工程结构不变。
 
 ## 8. 错误处理
@@ -248,3 +250,15 @@ macOS 15.4 起系统引入了"App 在无用户操作时读取剪切板"的隐私
 ## 10. 第一版不做
 
 图片 / 文件记录、忽略指定 App 名单、记录置顶 / 收藏、iCloud 同步、自定义热键、合并粘贴、富文本格式保留。
+
+## 11. 后续模块路线图
+
+每个模块单独走"设计 → 计划 → 实现"，以新 Target 实现 `AppModule` 后注册进外壳。
+
+| 顺序 | 模块 | 用户已提出的要求 | 已知的技术要点 |
+|---|---|---|---|
+| 2 | 截图 + 文字识别 | 类似 Snipaste 的截图体验；要轻量；比 Snipaste 多一个文字识别（OCR） | 截图用系统 ScreenCaptureKit，OCR 用系统 Vision（支持中英文，离线，无第三方依赖）；需要第二项授权"屏幕录制"；需要一个普通组合键热键 → 届时在 `Core` 增加通用热键注册 |
+| 3 | 文本片段 / 快捷短语 | 待定 | 复用 `FloatingPanel` 与 `PasteService` |
+| — | 翻译 | 待定 | 可接在 OCR 结果之后 |
+
+截图模块的具体范围（是否要贴图钉在屏幕上、标注工具、取色等）在其自己的设计环节确定。
