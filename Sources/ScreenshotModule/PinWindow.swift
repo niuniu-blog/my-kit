@@ -1,4 +1,5 @@
 import AppKit
+import os
 
 /// 贴图窗口的右键菜单要做的事，由 PinManager 转给 ScreenshotActions。
 enum PinMenuAction {
@@ -90,8 +91,12 @@ private final class PinContentView: NSView {
         owner?.applyScroll(deltaY: event.scrollingDeltaY)
     }
 
-    /// 触控板双指捏合：张开放大、捏拢缩小
+    /// 触控板双指捏合：张开放大、捏拢缩小。（手势直接送到贴图窗口时走这里；
+    /// 送给前台软件时由 PinManager 的全局监听处理，两条路不会同时触发。）
     override func magnify(with event: NSEvent) {
+        if event.phase == .began {
+            Logger(subsystem: "com.imiros.mykit", category: "pin").info("捏合手势：直接送达贴图窗口")
+        }
         owner?.applyMagnification(event.magnification)
     }
 
