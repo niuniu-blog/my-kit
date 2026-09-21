@@ -163,6 +163,18 @@ MyKit 需要两项系统授权，都只需要做一次。
 
 改了代码之后重新运行 `scripts/build-app.sh && scripts/install.sh`，不需要重新授权。
 
+## 制作安装包
+
+```bash
+scripts/make-dmg.sh
+```
+
+会生成 `build/MyKit-<版本号>.dmg`：里面是 MyKit、一个"应用程序"文件夹的快捷方式，和一份中文的《安装说明》。对方双击打开 dmg，把 MyKit 拖进应用程序文件夹就装好了。
+
+- 只支持 Apple 芯片（M 系列）的 Mac，macOS 14 或更新。
+- 版本号在 `Resources/Info.plist` 的 `CFBundleShortVersionString` 里改。
+- MyKit 没有做苹果的付费开发者认证，所以**别人的 Mac 第一次打开时会被系统拦住**，需要按《安装说明》第二节放行一次（系统设置 → 隐私与安全性 →「仍要打开」）。想彻底免掉这一步，需要注册 Apple Developer（每年 99 美元）并对安装包做"公证"，工程结构不用改，只是换一个签名身份并多一步公证。
+
 ## 开发
 
 ```bash
