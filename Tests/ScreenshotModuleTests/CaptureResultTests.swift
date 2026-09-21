@@ -45,4 +45,33 @@ import Testing
         #expect(size.width == 3024)
         #expect(size.height == 1964)
     }
+
+    // MARK: 标注
+
+    @Test func withoutAnnotationsBothImagesAreThePlainCrop() throws {
+        let result = try #require(CaptureResult.make(
+            selection: CGRect(x: 10, y: 5, width: 40, height: 20), snapshot: try makeSnapshot()
+        ))
+        #expect(result.image === result.ocrImage)
+        #expect(!result.annotationsDropped)
+    }
+
+    @Test func annotationsAreFlattenedIntoTheImageButOnlyMosaicIntoTheOCRImage() throws {
+        let selection = CGRect(x: 10, y: 5, width: 40, height: 20)
+        let box = Annotation(kind: .rectangle(CGRect(x: 4, y: 4, width: 20, height: 10)), color: .red, size: .small)
+
+        let boxed = try #require(CaptureResult.make(selection: selection, snapshot: try makeSnapshot(), annotations: [box]))
+        #expect(boxed.image.width == 80)
+        #expect(boxed.image.height == 40)
+        #expect(boxed.image !== boxed.ocrImage)          // image 是新合成的图
+        #expect(!boxed.annotationsDropped)
+
+        let plain = try #require(CaptureResult.make(selection: selection, snapshot: try makeSnapshot()))
+        #expect(boxed.ocrImage.width == plain.image.width)
+
+        let mosaic = Annotation(kind: .mosaic(CGRect(x: 4, y: 4, width: 24, height: 12)), color: .red, size: .small)
+        let hidden = try #require(CaptureResult.make(selection: selection, snapshot: try makeSnapshot(), annotations: [box, mosaic]))
+        #expect(hidden.image !== hidden.ocrImage)        // 两张都是新图：一张带全部标注，一张只带马赛克
+        #expect(hidden.ocrImage.width == 80)
+    }
 }

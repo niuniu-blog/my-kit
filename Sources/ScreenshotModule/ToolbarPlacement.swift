@@ -57,4 +57,22 @@ public enum ToolbarPlacement {
             y: clampY(min(selection.maxY, bounds.maxY) - gap - panelSize.height)
         )
     }
+
+    /// 标注样式栏（颜色 / 粗细）：紧贴工具条、左对齐，放在工具条"背向选区"的一侧 ——
+    /// 工具条在选区下方 → 样式栏在工具条下方；工具条在选区上方或选区内 → 样式栏在工具条上方。
+    /// 首选的一侧放不下就换另一侧。水平方向始终不超出屏幕。
+    public static func styleBarOrigin(
+        barSize: CGSize, toolbarFrame: CGRect, selection: CGRect, bounds: CGRect, gap: CGFloat = 6
+    ) -> CGPoint {
+        let x = min(max(toolbarFrame.minX, bounds.minX), max(bounds.minX, bounds.maxX - barSize.width))
+        let below = toolbarFrame.maxY + gap
+        let above = toolbarFrame.minY - gap - barSize.height
+        let fitsBelow = below + barSize.height <= bounds.maxY
+        let fitsAbove = above >= bounds.minY
+        let prefersBelow = toolbarFrame.minY >= selection.maxY
+        if prefersBelow {
+            return CGPoint(x: x, y: fitsBelow || !fitsAbove ? below : above)
+        }
+        return CGPoint(x: x, y: fitsAbove || !fitsBelow ? above : below)
+    }
 }

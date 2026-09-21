@@ -28,6 +28,9 @@ public struct SelectionModel {
     /// 这块屏上的窗口（屏内坐标，前 → 后）
     public let windows: [CGRect]
     public private(set) var hoverWindow: CGRect?
+    /// 选区锁定：有标注工具选中或已有标注时为 true。锁定期间选区不能移动 / 改大小，
+    /// 选区外拖动也不会开始新选区，手柄不可用。cancel / reset 不受影响（并会解除锁定）。
+    public var isLocked = false
     private var state: State = .idle
 
     public init(bounds: CGRect, windows: [CGRect]) {
@@ -84,7 +87,7 @@ public struct SelectionModel {
 
     /// 鼠标位置命中了哪个手柄（只有选区确定后才有手柄）。
     public func handle(at point: CGPoint) -> Handle? {
-        guard case .selected(let rect) = state else { return nil }
+        guard !isLocked, case .selected(let rect) = state else { return nil }
         return Self.handlePoints(for: rect).first { candidate in
             abs(candidate.point.x - point.x) <= Self.handleHitRadius
                 && abs(candidate.point.y - point.y) <= Self.handleHitRadius
@@ -99,6 +102,7 @@ public struct SelectionModel {
     }
 
     public mutating func mouseDown(at point: CGPoint) {
+        guard !isLocked else { return }
         switch state {
         case .idle:
             hoverWindow = WindowLocator.topWindow(at: point, in: windows)
@@ -170,6 +174,7 @@ public struct SelectionModel {
     public mutating func reset() {
         state = .idle
         hoverWindow = nil
+        isLocked = false
     }
 
     // MARK: 几何

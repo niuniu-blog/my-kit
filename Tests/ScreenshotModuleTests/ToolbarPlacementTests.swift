@@ -48,4 +48,37 @@ import Testing
             labelSize: label, selection: CGRect(x: 980, y: 100, width: 20, height: 50), bounds: bounds)
         #expect(origin == CGPoint(x: 910, y: 76))
     }
+
+    // MARK: 标注样式栏
+
+    private let styleBar = CGSize(width: 260, height: 36)
+
+    @Test func styleBarGoesBelowAToolbarThatIsBelowTheSelection() {
+        let selection = CGRect(x: 200, y: 100, width: 500, height: 300)
+        let toolbarFrame = CGRect(x: 100, y: 408, width: 600, height: 40)
+        let origin = ToolbarPlacement.styleBarOrigin(barSize: styleBar, toolbarFrame: toolbarFrame, selection: selection, bounds: bounds)
+        #expect(origin == CGPoint(x: 100, y: 454))       // 448 + 6
+    }
+
+    @Test func styleBarGoesAboveAToolbarThatIsAboveTheSelection() {
+        let selection = CGRect(x: 200, y: 400, width: 500, height: 380)
+        let toolbarFrame = CGRect(x: 100, y: 352, width: 600, height: 40)
+        let origin = ToolbarPlacement.styleBarOrigin(barSize: styleBar, toolbarFrame: toolbarFrame, selection: selection, bounds: bounds)
+        #expect(origin == CGPoint(x: 100, y: 310))       // 352 - 6 - 36：不盖住选区
+    }
+
+    @Test func styleBarFlipsWhenThePreferredSideDoesNotFit() {
+        // 工具条在选区下方，但已经贴近屏幕底部：样式栏改到工具条上方
+        let selection = CGRect(x: 200, y: 300, width: 500, height: 440)
+        let toolbarFrame = CGRect(x: 100, y: 748, width: 600, height: 40)
+        let origin = ToolbarPlacement.styleBarOrigin(barSize: styleBar, toolbarFrame: toolbarFrame, selection: selection, bounds: bounds)
+        #expect(origin == CGPoint(x: 100, y: 706))
+    }
+
+    @Test func styleBarStaysOnScreenHorizontally() {
+        let selection = CGRect(x: 900, y: 100, width: 100, height: 100)
+        let toolbarFrame = CGRect(x: 900, y: 208, width: 100, height: 40)
+        let origin = ToolbarPlacement.styleBarOrigin(barSize: styleBar, toolbarFrame: toolbarFrame, selection: selection, bounds: bounds)
+        #expect(origin == CGPoint(x: 740, y: 254))       // 1000 - 260
+    }
 }

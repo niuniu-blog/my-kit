@@ -41,17 +41,26 @@ public struct DisplaySnapshot: @unchecked Sendable {
 
 /// 一次截图的成品。
 public struct CaptureResult {
+    /// 复制 / 保存 / 贴图用：选区裁剪图 + 全部标注
     public let image: CGImage
+    /// 文字识别 / 翻译用：选区裁剪图 + 仅马赛克（被遮住的内容不会被识别，箭头、方框等不干扰识别）
+    public let ocrImage: CGImage
+    /// 标注没能合成上去（位图上下文创建失败），image 退回成了不带标注的原图
+    public let annotationsDropped: Bool
     /// 图片的 pt 尺寸（= 选区大小）
     public let pointSize: CGSize
     /// 选区在屏幕上的位置，AppKit 全局坐标 —— 贴图窗口直接用它当 frame
     public let screenRect: CGRect
 
-    /// 按选区（屏内坐标）从定格画面裁出成品。选区无效时返回 nil。
-    public static func make(selection: CGRect, snapshot: DisplaySnapshot) -> CaptureResult? {
-        guard let image = ImageCropper.crop(snapshot.image, rect: selection, scale: snapshot.imageScale) else { return nil }
+    /// 按选区（屏内坐标）从定格画面裁出成品，并把标注（选区内坐标）合成上去。选区无效时返回 nil。
+    public static func make(selection: CGRect, snapshot: DisplaySnapshot, annotations: [Annotation] = []) -> CaptureResult? {
+        guard let cropped = ImageCropper.crop(snapshot.image, rect: selection, scale: snapshot.imageScale) else { return nil }
+        let annotated = AnnotationRenderer.flatten(base: cropped, items: annotations, pointSize: selection.size)
+        let forOCR = AnnotationRenderer.flatten(base: cropped, items: annotations, pointSize: selection.size, onlyMosaic: true)
         return CaptureResult(
-            image: image,
+            image: annotated ?? cropped,
+            ocrImage: forOCR ?? cropped,
+            annotationsDropped: annotated == nil,
             pointSize: selection.size,
             screenRect: ScreenGeometry.appKitRect(fromLocal: selection, screenFrame: snapshot.screen.frame)
         )

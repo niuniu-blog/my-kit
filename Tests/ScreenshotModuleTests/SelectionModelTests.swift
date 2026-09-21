@@ -215,4 +215,51 @@ import Testing
         #expect(!model.hasConfirmedSelection)
         #expect(model.cancel() == true)
     }
+
+    // MARK: 锁定（标注期间）
+
+    @Test func lockedSelectionIgnoresMoveResizeAndRedraw() {
+        var model = makeSelected(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 300, y: 250))
+        let original = model.selection
+        model.isLocked = true
+
+        // 选区内拖动：不移动
+        model.mouseDown(at: CGPoint(x: 200, y: 200))
+        model.mouseDragged(to: CGPoint(x: 260, y: 260))
+        model.mouseUp(at: CGPoint(x: 260, y: 260))
+        #expect(model.selection == original)
+        #expect(!model.isAdjusting)
+
+        // 手柄：不可用
+        #expect(model.handle(at: CGPoint(x: 300, y: 250)) == nil)
+        model.mouseDown(at: CGPoint(x: 300, y: 250))
+        model.mouseDragged(to: CGPoint(x: 400, y: 400))
+        model.mouseUp(at: CGPoint(x: 400, y: 400))
+        #expect(model.selection == original)
+
+        // 选区外拖动：不开始新选区
+        model.mouseDown(at: CGPoint(x: 600, y: 600))
+        model.mouseDragged(to: CGPoint(x: 700, y: 700))
+        model.mouseUp(at: CGPoint(x: 700, y: 700))
+        #expect(model.selection == original)
+        #expect(model.hasConfirmedSelection)
+    }
+
+    @Test func unlockingRestoresNormalBehaviour() {
+        var model = makeSelected(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 300, y: 250))
+        model.isLocked = true
+        model.isLocked = false
+        model.mouseDown(at: CGPoint(x: 200, y: 200))
+        model.mouseDragged(to: CGPoint(x: 250, y: 220))
+        model.mouseUp(at: CGPoint(x: 250, y: 220))
+        #expect(model.selection == CGRect(x: 150, y: 120, width: 200, height: 150))
+    }
+
+    @Test func cancelAndResetStillWorkWhenLockedAndUnlock() {
+        var model = makeSelected(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 300, y: 250))
+        model.isLocked = true
+        #expect(model.cancel() == false)
+        #expect(model.selection == nil)
+        #expect(!model.isLocked)
+    }
 }
