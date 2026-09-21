@@ -13,6 +13,7 @@ let package = Package(
         ),
         .target(name: "ScreenshotModule", dependencies: ["Core"]),
         .target(name: "SystemMonitorModule", dependencies: ["Core"]),
+        .target(name: "UninstallerModule", dependencies: ["Core"]),
         .executableTarget(
             name: "MyKit",
             dependencies: ["Core", "ClipboardModule", "ScreenshotModule", "SystemMonitorModule"]
@@ -21,6 +22,7 @@ let package = Package(
         .testTarget(name: "ClipboardModuleTests", dependencies: ["ClipboardModule"]),
         .testTarget(name: "ScreenshotModuleTests", dependencies: ["ScreenshotModule"]),
         .testTarget(name: "SystemMonitorModuleTests", dependencies: ["SystemMonitorModule"]),
+        .testTarget(name: "UninstallerModuleTests", dependencies: ["UninstallerModule"]),
     ],
     swiftLanguageModes: [.v5]
 )
