@@ -7,7 +7,7 @@ import os
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let log = Logger(subsystem: "com.imiros.mykit", category: "app")
     private let registry = ModuleRegistry()
-    private let eventTap = ModifierEventTap()
+    private let eventTap = GlobalKeyTap()
     private let accessibilityWatcher = AccessibilityWatcher()
     private let onboarding = OnboardingWindowController()
     private var clipboard: ClipboardModule?

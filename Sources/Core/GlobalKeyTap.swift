@@ -2,19 +2,26 @@ import CoreGraphics
 import Foundation
 import os
 
-/// 全局监听键盘事件，检测到双击 Option 时回调。需要"辅助功能"授权。
-/// 回调发生在主线程（事件源加在主 RunLoop 上）。
-public final class ModifierEventTap {
+/// 全局键盘监听：检测"双击 Option"，以及已注册的组合键（如 ⌃⌘A）。需要"辅助功能"授权。
+/// 所有回调都发生在主线程（事件源加在主 RunLoop 上）。
+public final class GlobalKeyTap {
     public var onDoubleTap: (() -> Void)?
 
     private var port: CFMachPort?
     private var source: CFRunLoopSource?
     private var detector = DoubleTapDetector()
+    private var registrations: [(combo: KeyCombo, handler: () -> Void)] = []
     private let log = Logger(subsystem: "com.imiros.mykit", category: "hotkey")
 
     public init() {}
 
     public var isRunning: Bool { port != nil }
+
+    /// 注册一个组合键。按下时调用 handler，并且**吞掉**这次按键（前台 App 收不到）。
+    /// 可以在 start() 之前或之后调用。
+    public func register(_ combo: KeyCombo, handler: @escaping () -> Void) {
+        registrations.append((combo: combo, handler: handler))
+    }
 
     /// 返回 false 表示创建失败（通常是还没有辅助功能授权）。
     @discardableResult
@@ -24,12 +31,14 @@ public final class ModifierEventTap {
         let mask = (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.keyDown.rawValue)
         let callback: CGEventTapCallBack = { _, type, event, userInfo in
             if let userInfo {
-                let tap = Unmanaged<ModifierEventTap>.fromOpaque(userInfo).takeUnretainedValue()
-                tap.handle(type: type, event: event)
+                let tap = Unmanaged<GlobalKeyTap>.fromOpaque(userInfo).takeUnretainedValue()
+                if tap.handle(type: type, event: event) {
+                    return nil   // 已注册的组合键：吞掉
+                }
             }
-            return Unmanaged.passUnretained(event)   // 永远原样放行，不修改也不吞掉事件
+            return Unmanaged.passUnretained(event)   // 其余事件原样放行
         }
-        // .defaultTap 只需要"辅助功能"授权；.listenOnly 会额外要求"输入监控"
+        // .defaultTap 只需要"辅助功能"授权；.listenOnly 会额外要求"输入监控"，而且无法吞掉事件
         guard let port = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
@@ -62,20 +71,30 @@ public final class ModifierEventTap {
         self.source = nil
     }
 
-    private func handle(type: CGEventType, event: CGEvent) {
+    /// 返回 true 表示这个事件要被吞掉。
+    private func handle(type: CGEventType, event: CGEvent) -> Bool {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             // 系统会在回调太慢或用户输入安全内容时停用监听，这里立刻重新启用
             if let port { CGEvent.tapEnable(tap: port, enable: true) }
-            return
+            return false
         }
-        let translated = ModifierEventTranslator.translate(
-            type: type,
-            keyCode: event.getIntegerValueField(.keyboardEventKeycode),
-            flags: event.flags
-        )
-        guard let translated else { return }
-        if detector.handle(translated, at: ProcessInfo.processInfo.systemUptime) {
+
+        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+        let flags = event.flags
+
+        if let translated = ModifierEventTranslator.translate(type: type, keyCode: keyCode, flags: flags),
+           detector.handle(translated, at: ProcessInfo.processInfo.systemUptime) {
             onDoubleTap?()
         }
+
+        for registration in registrations
+        where KeyComboMatcher.matches(registration.combo, type: type, keyCode: keyCode, flags: flags) {
+            // 按住不放产生的自动重复：照样吞掉，但只在第一次按下时触发
+            if event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
+                registration.handler()
+            }
+            return true
+        }
+        return false
     }
 }
