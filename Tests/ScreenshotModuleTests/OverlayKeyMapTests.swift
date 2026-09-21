@@ -30,4 +30,12 @@ import Testing
         #expect(OverlayKeyMap.command(keyCode: 36, characters: "\r", modifiers: [.command]) == nil)
         #expect(OverlayKeyMap.command(keyCode: 0, characters: "a", modifiers: [.command]) == nil)
     }
+
+    @Test func commandZUndoesAndShiftCommandZRedoes() {
+        #expect(OverlayKeyMap.command(keyCode: 6, characters: "z", modifiers: [.command]) == .undo)
+        #expect(OverlayKeyMap.command(keyCode: 6, characters: "z", modifiers: [.command, .shift]) == .redo)
+        #expect(OverlayKeyMap.command(keyCode: 6, characters: "Z", modifiers: [.command, .shift, .capsLock]) == .redo)
+        #expect(OverlayKeyMap.command(keyCode: 6, characters: "z", modifiers: []) == nil)
+        #expect(OverlayKeyMap.command(keyCode: 6, characters: "z", modifiers: [.command, .option]) == nil)
+    }
 }

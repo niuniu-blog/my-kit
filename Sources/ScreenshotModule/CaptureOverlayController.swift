@@ -28,17 +28,54 @@ final class OverlayPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
+    /// 文字标注的输入框正在编辑时，它是第一响应者
+    private var editingTextView: NSTextView? {
+        firstResponder as? NSTextView
+    }
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown {
+            if let editor = editingTextView {
+                // 正在输入文字：按键交给输入框（含中文输入法）。只有 Esc 例外 —— 而且输入法正在组字时 Esc 也归输入法
+                if event.keyCode == 53, !editor.hasMarkedText() {
+                    _ = keyHandler?(event)
+                    return
+                }
+                super.sendEvent(event)
+                return
+            }
             _ = keyHandler?(event)
-            return                       // 截图期间所有按键到此为止（也避免系统"咚"一声）
+            return                       // 截图期间其余按键到此为止（也避免系统"咚"一声）
         }
         super.sendEvent(event)
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if let editor = editingTextView {
+            forwardEditingShortcut(event, to: editor)
+            return true
+        }
         _ = keyHandler?(event)
         return true                      // ⌘ 组合键同样不再往下传
+    }
+
+    /// MyKit 没有主菜单，输入框里的 ⌘X / ⌘C / ⌘V / ⌘A / ⌘Z / ⇧⌘Z 要自己转发。
+    private func forwardEditingShortcut(_ event: NSEvent, to editor: NSTextView) {
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        guard let key = event.charactersIgnoringModifiers?.lowercased() else { return }
+        if modifiers == [.command, .shift], key == "z" {
+            editor.undoManager?.redo()
+            return
+        }
+        guard modifiers == .command else { return }
+        switch key {
+        case "x": editor.cut(nil)
+        case "c": editor.copy(nil)
+        case "v": editor.pasteAsPlainText(nil)
+        case "a": editor.selectAll(nil)
+        case "z": editor.undoManager?.undo()
+        default: break
+        }
     }
 }
 
@@ -80,7 +117,11 @@ final class CaptureOverlayController: OverlayViewDelegate {
             imageView.autoresizingMask = [.width, .height]
 
             let windows = WindowLocator.localRects(cgWindows: cgWindows, displayBounds: snapshot.screen.cgBounds)
-            let overlay = OverlayView(frame: localBounds, windows: windows)
+            let overlay = OverlayView(
+                frame: localBounds, windows: windows,
+                snapshotImage: snapshot.image, imageScale: snapshot.imageScale,
+                annotationSettings: settings.annotation
+            )
             overlay.autoresizingMask = [.width, .height]
 
             let container = NSView(frame: localBounds)
@@ -152,18 +193,27 @@ final class CaptureOverlayController: OverlayViewDelegate {
     private func handle(_ command: OverlayCommand) {
         switch command {
         case .cancel:
-            // 第一级：清掉选区；没有任何选区可清 → 退出截图
-            var clearedSomething = false
-            for entry in entries where !entry.view.cancelSelection() {
-                clearedSomething = true
+            // 每块屏按层级处理一级（完成文字 → 取消工具 → 清选区和标注）；哪块屏都没东西可取消 → 退出截图
+            var cancelledSomething = false
+            for entry in entries where !entry.view.handleCancel() {
+                cancelledSomething = true
             }
-            if !clearedSomething { end() }
+            if !cancelledSomething { end() }
+
+        case .undo:
+            entries.first(where: { $0.view.model.hasConfirmedSelection })?.view.undo()
+
+        case .redo:
+            entries.first(where: { $0.view.model.hasConfirmedSelection })?.view.redo()
 
         case .perform(let action):
             guard let entry = entries.first(where: { $0.view.model.hasConfirmedSelection }),
-                  let selection = entry.view.model.selection,
-                  let result = CaptureResult.make(selection: selection, snapshot: entry.snapshot)
+                  let selection = entry.view.model.selection
             else { return }                     // 还没有选区：按键无效果
+            entry.view.commitPendingText()      // 还在输入框里的文字先落成标注
+            guard let result = CaptureResult.make(
+                selection: selection, snapshot: entry.snapshot, annotations: entry.view.annotations
+            ) else { return }
             if action == .recognize {
                 showRecognition(of: result, selection: selection, in: entry)   // 遮罩保持打开
                 return
@@ -210,7 +260,7 @@ final class CaptureOverlayController: OverlayViewDelegate {
             at: frame
         )
         Task { [ocrModel] in
-            await ocrModel.run(on: result.image)
+            await ocrModel.run(on: result.ocrImage)      // 原图 + 仅马赛克：被遮住的不识别，箭头等不干扰
         }
     }
 

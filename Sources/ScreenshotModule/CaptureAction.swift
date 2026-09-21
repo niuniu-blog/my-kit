@@ -9,6 +9,9 @@ public enum CaptureAction: Equatable, CaseIterable {
 enum OverlayCommand: Equatable {
     case cancel
     case perform(CaptureAction)
+    /// 撤销 / 重做最后一个标注
+    case undo
+    case redo
 }
 
 /// 键盘 → 指令。纯函数。
@@ -19,8 +22,11 @@ enum OverlayKeyMap {
         if relevant.isEmpty, keyCode == 36 || keyCode == 76 {                 // 回车 / 小键盘回车
             return .perform(.copy)
         }
-        guard relevant == .command, let key = characters?.lowercased() else { return nil }
+        guard let key = characters?.lowercased() else { return nil }
+        if relevant == [.command, .shift], key == "z" { return .redo }       // ⇧⌘Z
+        guard relevant == .command else { return nil }
         switch key {
+        case "z": return .undo
         case "c": return .perform(.copy)
         case "s": return .perform(.save)
         case "r": return .perform(.recognize)
