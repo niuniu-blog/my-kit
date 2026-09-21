@@ -1,6 +1,6 @@
 import CoreGraphics
 
-/// 一个全局组合键，例如 ⌃⌘A。
+/// 一个全局组合键，例如 ⇧⌘A。
 public struct KeyCombo: Equatable {
     /// 虚拟键码（与键盘布局无关），A = 0
     public let keyCode: Int64
@@ -12,8 +12,8 @@ public struct KeyCombo: Equatable {
         self.modifiers = modifiers
     }
 
-    /// ⌃⌘A —— 截图
-    public static let controlCommandA = KeyCombo(keyCode: 0, modifiers: [.maskControl, .maskCommand])
+    /// ⇧⌘A —— 截图
+    public static let shiftCommandA = KeyCombo(keyCode: 0, modifiers: [.maskShift, .maskCommand])
 }
 
 /// 判断一个键盘事件是否正好是某个组合键。纯函数。

@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import os
 
-/// 全局键盘监听：检测"双击 Option"，以及已注册的组合键（如 ⌃⌘A）。需要"辅助功能"授权。
+/// 全局键盘监听：检测"双击 Option"，以及已注册的组合键（如 ⇧⌘A）。需要"辅助功能"授权。
 /// 所有回调都发生在主线程（事件源加在主 RunLoop 上）。
 public final class GlobalKeyTap {
     public var onDoubleTap: (() -> Void)?

@@ -25,7 +25,7 @@ import Testing
 
         #expect(items.map(\.title) == ["截图", "关闭所有贴图"])
         #expect(items[0].keyEquivalent == "a")
-        #expect(items[0].keyEquivalentModifierMask == [.control, .command])
+        #expect(items[0].keyEquivalentModifierMask == [.shift, .command])
         #expect(items.allSatisfy { $0.target != nil && $0.action != nil })
     }
 

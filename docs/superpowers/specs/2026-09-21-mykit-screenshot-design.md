@@ -19,7 +19,7 @@
 
 | 项 | 决策 |
 |---|---|
-| 快捷键 | `⌃⌘A`（与微信截图相同）；菜单栏菜单里另有"截图"一项 |
+| 快捷键 | `⇧⌘A`（最初定为 ⌃⌘A，安装试用后用户改为 ⇧⌘A）；菜单栏菜单里另有"截图"一项 |
 | 技术方案 | 自己做遮罩 + 定格画面：ScreenCaptureKit 截全屏 → 遮罩上框选 → 选区旁出工具条 |
 | OCR 结果 | 弹出可编辑的结果窗口，同时全文自动复制到剪切板 |
 | OCR 引擎 | 系统 Vision（`VNRecognizeTextRequest`），简体中文 + 繁体中文 + 英文，离线。已在本机验证可准确识别中英文混排 |
@@ -34,7 +34,7 @@
 
 ### 2.1 开始截图
 
-按 `⌃⌘A`（或点菜单栏图标 →「截图」）→ 所有显示器的画面同时定格并略微变暗，鼠标变成十字。截图进行中再按一次 `⌃⌘A` = 直接退出截图（保底退出：走全局键盘监听，不依赖遮罩拿到键盘焦点）。
+按 `⇧⌘A`（或点菜单栏图标 →「截图」）→ 所有显示器的画面同时定格并略微变暗，鼠标变成十字。截图进行中再按一次 `⇧⌘A` = 直接退出截图（保底退出：走全局键盘监听，不依赖遮罩拿到键盘焦点）。
 
 ### 2.2 选区
 
@@ -117,9 +117,9 @@
 - 较新的 macOS 会定期弹窗询问"是否继续允许 MyKit 录制屏幕"，系统行为，README 里说明。
 - 快捷键依赖已有的"辅助功能"授权；未授权时只能从菜单栏菜单触发截图。
 
-### 待实测：与微信的 `⌃⌘A` 冲突
+### 快捷键冲突（历史：最初选的 ⌃⌘A 与微信默认截图键相同）
 
-我们的事件监听是 `.cgSessionEventTap` + `.headInsertEventTap` + `.defaultTap`，匹配到组合键后**吞掉事件**（回调返回 nil）。实现阶段实测微信开着时谁先收到：若我们稳定先拦截，则无需用户操作；否则在 README 和引导里写明到微信「设置 → 快捷键」关闭截图快捷键。
+事件监听是 `.cgSessionEventTap` + `.headInsertEventTap` + `.defaultTap`，匹配到组合键后**吞掉事件**（回调返回 nil）。现用的 `⇧⌘A` 会盖掉访达「前往应用程序」、Chrome「搜索标签页」等 App 内同键功能，且与钉钉默认截图键相同；用户已取消微信和钉钉的截图快捷键。README 里有相应说明。
 
 ## 4. 架构
 
@@ -129,7 +129,7 @@
 
 | 单元 | 说明 | 测试 |
 |---|---|---|
-| `KeyCombo` + `KeyComboMatcher` | `KeyCombo { keyCode: Int64; modifiers: CGEventFlags }`；`static let controlCommandA`（keyCode 0）。匹配条件：`keyDown`、非自动重复、keyCode 相等、`flags ∩ {⌘,⌃,⌥,⇧}` 与 `modifiers` **完全相等** | ✅ 纯函数 |
+| `KeyCombo` + `KeyComboMatcher` | `KeyCombo { keyCode: Int64; modifiers: CGEventFlags }`；`static let shiftCommandA`（keyCode 0）。匹配条件：`keyDown`、非自动重复、keyCode 相等、`flags ∩ {⌘,⌃,⌥,⇧}` 与 `modifiers` **完全相等** | ✅ 纯函数 |
 | `ModifierEventTap` → 改名 `GlobalKeyTap` | 保留 `onDoubleTap`；新增 `register(_ combo: KeyCombo, handler: @escaping () -> Void)`。匹配到组合键时调用 handler 并吞掉事件；其余事件原样放行 | 手动 |
 | `Toast` | `Toast.show(_ message: String)` | 手动 |
 | `Permissions` 增补 | `isScreenRecordingGranted`、`requestScreenRecording()`、`openScreenRecordingSettings()`、`relaunch()` | 手动 |
@@ -156,11 +156,11 @@
 | `OCRResultWindowController` | §2.5 的窗口（SwiftUI，状态放在 `ObservableObject` 里） | 手动 |
 | `ScreenRecordingGuideWindowController` | §3 的引导窗口 | 手动 |
 | `ScreenshotSettingsView` | 显示当前保存文件夹 +「选择…」（`NSOpenPanel`） | 手动 |
-| `ScreenshotModule` | `AppModule`：`startCapture()`；菜单项「截图」（显示 ⌃⌘A）、「关闭所有贴图」；设置页 | ✅ 身份 / 菜单项 |
+| `ScreenshotModule` | `AppModule`：`startCapture()`；菜单项「截图」（显示 ⇧⌘A）、「关闭所有贴图」；设置页 | ✅ 身份 / 菜单项 |
 
 ### 4.3 外壳接线
 
-`AppDelegate`：注册 `ScreenshotModule`；`keyTap.register(.controlCommandA) { screenshot.startCapture() }`。
+`AppDelegate`：注册 `ScreenshotModule`；`keyTap.register(.shiftCommandA) { screenshot.startCapture() }`。
 
 ### 4.4 坐标系约定
 
@@ -189,7 +189,7 @@
 
 自动化（Swift Testing）：`KeyComboMatcher`、`PasteService` 新方法、`ClipboardMonitor` 来源标记、`WindowLocator` 纯函数、`SelectionModel`（悬停、单击选窗、拖出选区、移动、8 个手柄缩放、边界夹取、最小尺寸、两级取消）、`ToolbarPlacement`、`ImageCropper`（含 2× 缩放与越界）、`ScreenshotFileNamer`、`ScreenshotSaver`（含回退）、`ScreenshotSettings`、`TextRecognizer`（生成中英文图片做真实识别；空白图片返回空）、`PinZoom`、`ScreenshotModule` 身份与菜单项。
 
-手动验收清单（实现计划的最后一个任务里逐条列出）：授权引导与重启、`⌃⌘A` 触发与吞键、微信冲突实测、窗口高亮与单击选窗、框选 / 移动 / 缩放、工具条位置、五个操作及其快捷键、两级取消、多显示器、Retina 清晰度、贴图的拖动 / 缩放 / 右键菜单 / 多张 / 全屏 App 上显示、OCR 结果窗口的编辑与重新复制、OCR 文字在剪切板历史里来源显示为 MyKit、保存文件夹设置与回退、截图结束后内存回落。
+手动验收清单（实现计划的最后一个任务里逐条列出）：授权引导与重启、`⇧⌘A` 触发与吞键、微信冲突实测、窗口高亮与单击选窗、框选 / 移动 / 缩放、工具条位置、五个操作及其快捷键、两级取消、多显示器、Retina 清晰度、贴图的拖动 / 缩放 / 右键菜单 / 多张 / 全屏 App 上显示、OCR 结果窗口的编辑与重新复制、OCR 文字在剪切板历史里来源显示为 MyKit、保存文件夹设置与回退、截图结束后内存回落。
 
 ## 8. 实现阶段的细化（写计划并编译验证时确定）
 
@@ -202,6 +202,7 @@
 7. 鼠标离开某块屏时清除该屏上的窗口高亮；同一时间只有一块屏上有选区。
 8. 从菜单栏菜单触发截图时延迟 0.25 秒，避免把菜单本身截进去。
 9. 截图期间遮罩面板吞掉所有键盘事件（不会传给下面的 App，也不会发出系统提示音）。
-10. 保底退出：遮罩显示期间再按 `⌃⌘A` 直接结束截图（走全局键盘监听，不依赖遮罩的键盘焦点）。
+10. 保底退出：遮罩显示期间再按 `⇧⌘A` 直接结束截图（走全局键盘监听，不依赖遮罩的键盘焦点）。
 11. 用户已取消微信和钉钉的截图快捷键，§3 的冲突实测不再需要；README 保留一句提示，供日后分享给他人时参考。
 12. 环境发现：Swift Testing 的 `#expect` 里不能直接写字面量算术（如 `x == 1600 - 16`），需先用 `let` 算好；Vision 在新进程身份下首次识别约 20–25 秒，之后约 0.3 秒。
+13. 快捷键变更：用户试用后要求把截图快捷键从 ⌃⌘A 改为 ⇧⌘A（`KeyCombo.shiftCommandA`）。实现计划文档保留原始的 ⌃⌘A 写法，以本条为准。

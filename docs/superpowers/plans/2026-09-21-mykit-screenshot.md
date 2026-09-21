@@ -1,5 +1,8 @@
 # MyKit 截图模块（第一期）Implementation Plan
 
+> **实现后变更（2026-09-21）：** 截图快捷键已按用户要求从 ⌃⌘A 改为 **⇧⌘A**（`KeyCombo.shiftCommandA`，菜单显示与设置页文字同步修改）；另增加了"截图进行中再按一次快捷键 = 保底退出"。本文档正文保留执行时的原貌，凡出现 ⌃⌘A / `controlCommandA` 之处，以代码和设计文档 §8 为准。
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 给 MyKit 增加类似 Snipaste 的截图：按 `⌃⌘A` 定格屏幕，框选或点选窗口，然后复制 / 保存 PNG / 识别文字（OCR）/ 贴在屏幕上。

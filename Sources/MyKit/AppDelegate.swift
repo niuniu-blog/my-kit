@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         eventTap.onDoubleTap = { [weak self] in
             self?.clipboard?.togglePanel()
         }
-        eventTap.register(.controlCommandA) { [weak self] in
+        eventTap.register(.shiftCommandA) { [weak self] in
             self?.screenshot?.startCapture()
         }
         accessibilityWatcher.onChange = { [weak self] trusted in

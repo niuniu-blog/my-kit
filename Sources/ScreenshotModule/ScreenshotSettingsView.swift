@@ -11,7 +11,7 @@ struct ScreenshotSettingsView: View {
 
     var body: some View {
         LabeledContent("快捷键") {
-            Text("⌃⌘A")
+            Text("⇧⌘A")
                 .foregroundStyle(.secondary)
         }
         LabeledContent("保存位置") {

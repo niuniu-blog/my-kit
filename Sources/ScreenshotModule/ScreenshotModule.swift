@@ -30,10 +30,10 @@ public final class ScreenshotModule: NSObject, AppModule {
         actions.pins.closeAll()
     }
 
-    /// 开始一次截图（⌃⌘A 或菜单）。没有"屏幕录制"授权时改为弹出引导窗口。
+    /// 开始一次截图（⇧⌘A 或菜单）。没有"屏幕录制"授权时改为弹出引导窗口。
     public func startCapture() {
         if let session {
-            // 保底退出：截图进行中再按一次 ⌃⌘A 直接结束截图。这条路走全局键盘监听，
+            // 保底退出：截图进行中再按一次 ⇧⌘A 直接结束截图。这条路走全局键盘监听，
             // 不依赖遮罩面板拿到键盘焦点，所以即使 Esc 失灵屏幕也不会被卡住。
             session.end()
             return
@@ -85,7 +85,7 @@ public final class ScreenshotModule: NSObject, AppModule {
 
     private lazy var captureMenuItem: NSMenuItem = {
         let item = NSMenuItem(title: "截图", action: #selector(captureFromMenu), keyEquivalent: "a")
-        item.keyEquivalentModifierMask = [.control, .command]     // 在菜单里显示 ⌃⌘A
+        item.keyEquivalentModifierMask = [.shift, .command]       // 在菜单里显示 ⇧⌘A
         item.target = self
         return item
     }()
