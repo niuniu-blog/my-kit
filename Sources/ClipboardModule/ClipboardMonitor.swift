@@ -1,4 +1,5 @@
 import AppKit
+import Core
 import os
 
 /// 对系统剪切板的只读抽象，测试里用假实现替换。
@@ -31,6 +32,9 @@ public final class ClipboardMonitor {
     private var lastChangeCount: Int
     private var timer: Timer?
     private let log = Logger(subsystem: "com.imiros.mykit", category: "clipboard")
+
+    /// 带 MyKit 来源标记的内容记到这个来源名下
+    static let myKitApp: (bundleID: String?, name: String?) = (bundleID: "com.imiros.mykit", name: "MyKit")
 
     public init(
         pasteboard: PasteboardReading,
@@ -71,14 +75,13 @@ public final class ClipboardMonitor {
         lastChangeCount = current          // 先同步再 await，重叠的 poll 不会重复处理同一次变化
         guard !isPaused else { return }
 
-        let decision = CaptureFilter.decide(
-            types: pasteboard.currentTypeIdentifiers(),
-            string: pasteboard.currentString()
-        )
+        let types = pasteboard.currentTypeIdentifiers()
+        let decision = CaptureFilter.decide(types: types, string: pasteboard.currentString())
         do {
             switch decision {
             case .record(let text):
-                let app = frontmostApp()
+                // MyKit 自己产生的文字（如截图的文字识别结果）：来源记为 MyKit，而不是当时的前台 App
+                let app = types.contains(PasteService.originMarkerType.rawValue) ? Self.myKitApp : frontmostApp()
                 try await store.add(text: text, appBundleID: app.bundleID, appName: app.name, at: now())
             case .touchOwn(let text):
                 try await store.touch(text: text, at: now())

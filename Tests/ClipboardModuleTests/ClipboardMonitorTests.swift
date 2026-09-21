@@ -104,6 +104,20 @@ private final class FakePasteboard: PasteboardReading {
         #expect(count == 0)
     }
 
+    @Test func contentWithMyKitOriginMarkerIsRecordedWithMyKitAsSource() async throws {
+        let pasteboard = FakePasteboard()
+        let store = try ClipboardStore(location: .inMemory)
+        let monitor = makeMonitor(pasteboard, store, now: { self.t0 })
+
+        pasteboard.copy("截图里识别出来的文字", extraTypes: ["com.imiros.mykit.origin"])
+        await monitor.poll()
+
+        let items = try await store.search(query: "", limit: 10, offset: 0)
+        #expect(items.map(\.text) == ["截图里识别出来的文字"])
+        #expect(items.first?.appBundleID == "com.imiros.mykit")
+        #expect(items.first?.appName == "MyKit")
+    }
+
     @Test func ownWriteMovesExistingItemToTopWithoutDuplicating() async throws {
         let pasteboard = FakePasteboard()
         let store = try ClipboardStore(location: .inMemory)

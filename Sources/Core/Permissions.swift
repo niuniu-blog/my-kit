@@ -26,6 +26,34 @@ public enum Permissions {
         return false
     }
 
+    /// "屏幕录制"授权：截图需要它。授权后必须重启 App 才生效。
+    public static var isScreenRecordingGranted: Bool {
+        CGPreflightScreenCaptureAccess()
+    }
+
+    /// 第一次调用会弹出系统提示，并让 MyKit 出现在系统设置的"录屏与系统录音"列表里。
+    @discardableResult
+    public static func requestScreenRecording() -> Bool {
+        CGRequestScreenCaptureAccess()
+    }
+
+    public static func openScreenRecordingSettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
+        NSWorkspace.shared.open(url)
+    }
+
+    /// 重新启动 MyKit：先拉起一个新实例，再退出当前实例。
+    @MainActor
+    public static func relaunch() {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { _, _ in
+            DispatchQueue.main.async {
+                NSApp.terminate(nil)
+            }
+        }
+    }
+
     public static func openPrivacySettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security")!
         NSWorkspace.shared.open(url)
