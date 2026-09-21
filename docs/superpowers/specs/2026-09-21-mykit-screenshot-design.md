@@ -232,3 +232,4 @@
     - `FloatingPanel` 新增 `closesOnResignKey`（默认 true）。遮罩上的结果面板设为 false：系统提示框抢走键盘焦点时面板不能关闭（否则翻译任务会被取消）；面板只在点击定格画面 / 工具条时收起（`overlayViewDidBeginInteraction`）。
     - 翻译失败且语言包仍未安装时，`OCRResultModel.reportLanguagePackMissing()` 把提示换成具体办法：在系统提示里点「下载」，或手动到 系统设置 → 通用 → 语言与地区 → 翻译语言 下载「英语」和「简体中文」（已测）。
     - 仍需真机确认：下载提示在降级后的遮罩上是否可见、下载完成后是否需要重新勾选一次。
+18. 贴图支持触控板双指捏合缩放（用户试用后提出）：`PinZoom.scale(current:magnification:)`（相对当前大小、夹在 10%…500%、异常负值不会让图片翻转，已测），`PinWindow` 的内容视图响应 `magnify(with:)`；原有的滚轮 / 双指滑动缩放保留。

@@ -38,7 +38,15 @@ final class PinWindow: NSPanel {
     override var canBecomeMain: Bool { false }
 
     func applyScroll(deltaY: CGFloat) {
-        let next = PinZoom.scale(current: zoom, scrollDeltaY: deltaY)
+        applyZoom(PinZoom.scale(current: zoom, scrollDeltaY: deltaY))
+    }
+
+    /// 触控板双指捏合
+    func applyMagnification(_ magnification: CGFloat) {
+        applyZoom(PinZoom.scale(current: zoom, magnification: magnification))
+    }
+
+    private func applyZoom(_ next: CGFloat) {
         guard next != zoom else { return }
         zoom = next
         setFrame(PinZoom.frame(current: frame, baseSize: baseSize, scale: zoom), display: true)
@@ -80,6 +88,11 @@ private final class PinContentView: NSView {
 
     override func scrollWheel(with event: NSEvent) {
         owner?.applyScroll(deltaY: event.scrollingDeltaY)
+    }
+
+    /// 触控板双指捏合：张开放大、捏拢缩小
+    override func magnify(with event: NSEvent) {
+        owner?.applyMagnification(event.magnification)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
