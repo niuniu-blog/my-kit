@@ -636,7 +636,7 @@ Run:
 open build/MyKit.app
 sleep 2
 pgrep -x MyKit && echo "进程在运行"
-log show --last 1m --predicate 'subsystem == "com.imiros.mykit"' --info | grep "MyKit 已启动"
+/usr/bin/log show --last 1m --predicate 'subsystem == "com.imiros.mykit"' --info | grep "MyKit 已启动"
 pkill -x MyKit
 ```
 
@@ -3538,7 +3538,7 @@ Run:
 ```bash
 scripts/install.sh
 sleep 3
-log show --last 1m --predicate 'subsystem == "com.imiros.mykit"' --info | grep "MyKit 已启动"
+/usr/bin/log show --last 1m --predicate 'subsystem == "com.imiros.mykit"' --info | grep "MyKit 已启动"
 echo "mykit-privacy-probe-$(date +%s)" | pbcopy
 sleep 2
 sqlite3 "$HOME/Library/Application Support/MyKit/clipboard.sqlite" \
