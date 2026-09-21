@@ -27,6 +27,11 @@ public struct ScreenshotSettings {
         }
     }
 
+    /// 标注工具的颜色 / 粗细记忆，和本设置共用同一个 UserDefaults
+    public var annotation: AnnotationSettings {
+        AnnotationSettings(defaults: defaults)
+    }
+
     /// 识别结果面板上"翻译成中文"的勾选状态：勾上后每次识别完自动翻译，直到取消。
     public var autoTranslate: Bool {
         get { defaults.bool(forKey: Self.autoTranslateKey) }
