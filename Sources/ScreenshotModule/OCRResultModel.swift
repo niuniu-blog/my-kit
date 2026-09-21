@@ -129,22 +129,11 @@ final class OCRResultModel: ObservableObject {
         }
     }
 
-    /// 语言包还没装、需要换到普通窗口去下载时，界面层用它把"正在翻译"状态先停掉。
-    func cancelPendingTranslation() {
+    /// 翻译失败且确认是因为英译中语言包没装好时调用：把提示换成具体的下载办法。
+    func reportLanguagePackMissing() {
         isTranslating = false
-        translationStatus = ""
-    }
-
-    /// 在另一个窗口里接着用：直接填入已经识别好的文字（不重新识别）。
-    func adopt(text recognized: String) {
-        generation += 1
-        isRecognizing = false
-        text = recognized
-        status = "✓ 已复制全文"
         translation = ""
-        translationStatus = ""
-        isTranslating = false
-        translateEnabled = loadAutoTranslate()
+        translationStatus = "还没有安装英译中语言包。\n请在系统弹出的提示里点「下载」；\n如果没有看到提示：打开 系统设置 → 通用 → 语言与地区 → 翻译语言，\n下载「英语」和「简体中文」，然后重新勾选「翻译成中文」。"
     }
 
     func copyTranslation() {

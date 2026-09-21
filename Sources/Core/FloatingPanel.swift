@@ -63,10 +63,13 @@ public final class FloatingPanel: NSPanel {
         makeKey()
     }
 
-    // 点击面板外部 → 失去 key → 关闭
+    /// 失去键盘焦点时是否自动关闭（点击面板外部即关闭）。需要在系统提示框抢走焦点时
+    /// 保持显示的面板（如截图遮罩上的识别结果）设为 false，由使用方自己决定何时关闭。
+    public var closesOnResignKey = true
+
     public override func resignKey() {
         super.resignKey()
-        close()
+        if closesOnResignKey { close() }
     }
 
     public override func close() {

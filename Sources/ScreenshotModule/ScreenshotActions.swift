@@ -35,11 +35,6 @@ final class ScreenshotActions {
         }
     }
 
-    /// 截图遮罩上识别好的文字，换到普通窗口里继续（下载翻译语言包时用）。
-    func continueRecognitionInWindow(text: String) {
-        ocrWindow.continueWith(text: text)
-    }
-
     /// 保存结果 → 提示文案。文件夹用系统显示的名字（"桌面"而不是 "Desktop"）。
     static func message(for outcome: SaveOutcome) -> String {
         switch outcome {

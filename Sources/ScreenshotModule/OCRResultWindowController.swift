@@ -13,16 +13,6 @@ final class OCRResultWindowController {
         model = OCRResultModel.live(settings: settings)
     }
 
-    /// 截图遮罩上已经识别好了、但翻译需要先下载语言包：换到这个普通窗口里接着做，
-    /// 系统的下载提示在普通窗口上才能正常显示。
-    func continueWith(text: String) {
-        show()
-        model.adopt(text: text)
-        if model.translateEnabled {
-            model.requestTranslation()
-        }
-    }
-
     func recognize(_ image: CGImage) {
         show()
         Task { await model.run(on: image) }
@@ -56,8 +46,9 @@ struct OCRResultView: View {
     @ObservedObject var model: OCRResultModel
     let closeTitle: String
     let onClose: () -> Void
-    /// 只有截图遮罩上的面板会传：英译中语言包还没安装时调用，由调用方换到普通窗口去下载。
-    var onNeedsLanguageDownload: (() -> Void)?
+    /// 只有截图遮罩上的面板会传。true = 语言包还没装，系统马上要弹下载提示（遮罩需要临时让出层级，
+    /// 否则提示会被全屏遮罩挡住）；false = 这次翻译结束了（无论成败），可以恢复。
+    var onLanguageDownloadActive: ((Bool) -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -114,18 +105,18 @@ struct OCRResultView: View {
             .padding(12)
         }
         .frame(minWidth: 320, minHeight: 200)
-        .modifier(TranslationRunnerIfAvailable(model: model, onNeedsLanguageDownload: onNeedsLanguageDownload))
+        .modifier(TranslationRunnerIfAvailable(model: model, onLanguageDownloadActive: onLanguageDownloadActive))
     }
 }
 
 /// 系统翻译框架需要 macOS 15；更早的系统上不显示勾选框，这个修饰器也什么都不做。
 private struct TranslationRunnerIfAvailable: ViewModifier {
     let model: OCRResultModel
-    let onNeedsLanguageDownload: (() -> Void)?
+    let onLanguageDownloadActive: ((Bool) -> Void)?
 
     func body(content: Content) -> some View {
         if #available(macOS 15.0, *) {
-            content.modifier(TranslationRunner(model: model, onNeedsLanguageDownload: onNeedsLanguageDownload))
+            content.modifier(TranslationRunner(model: model, onLanguageDownloadActive: onLanguageDownloadActive))
         } else {
             content
         }
@@ -136,7 +127,7 @@ private struct TranslationRunnerIfAvailable: ViewModifier {
 @available(macOS 15.0, *)
 private struct TranslationRunner: ViewModifier {
     @ObservedObject var model: OCRResultModel
-    let onNeedsLanguageDownload: (() -> Void)?
+    let onLanguageDownloadActive: ((Bool) -> Void)?
     @ViewState private var configuration: TranslationSession.Configuration?   // 不能写 @State，见 Global Constraints
 
     private static let english = Locale.Language(identifier: "en")
@@ -160,19 +151,23 @@ private struct TranslationRunner: ViewModifier {
                     }
                     return output
                 }
+                // 翻译结束（无论成败）。失败时如果语言包仍未装好，把提示换成具体的下载办法。
+                if model.translation.isEmpty, !model.translationStatus.isEmpty,
+                   await LanguageAvailability().status(from: Self.english, to: Self.chinese) != .installed {
+                    model.reportLanguagePackMissing()
+                }
+                onLanguageDownloadActive?(false)
             }
     }
 
     private func start() {
         guard model.isTranslating else { return }
         Task { @MainActor in
-            if let onNeedsLanguageDownload {
-                // 全屏遮罩可能挡住系统的下载提示：语言包没装好就先换到普通窗口
+            if let onLanguageDownloadActive {
+                // 截图画面不关闭。语言包没装好时系统会弹下载提示 —— 先让全屏遮罩临时让出层级，免得挡住它
                 let status = await LanguageAvailability().status(from: Self.english, to: Self.chinese)
                 if status != .installed {
-                    model.cancelPendingTranslation()
-                    onNeedsLanguageDownload()
-                    return
+                    onLanguageDownloadActive(true)
                 }
             }
             if configuration == nil {

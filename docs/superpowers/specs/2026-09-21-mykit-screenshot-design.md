@@ -227,3 +227,8 @@
     - 语言包未安装且处在截图遮罩上时：系统的下载提示可能被全屏遮罩挡住，所以先用 `LanguageAvailability` 检查，未安装则结束截图，经 `onContinueInWindow` 把已识别的文字交给普通的识别结果窗口（`OCRResultWindowController.continueWith(text:)`）在那里下载并翻译。
     - 面板尺寸改为 400×440，普通窗口改为 480×460，给译文留出空间。
     - 未能自动验证（需要真机操作）：语言包下载提示的实际表现、`.translationTask` 在不激活 App 的面板里的表现、译文质量。
+17. 翻译时也不关闭截图（用户试用后提出"翻译的时候也不要关闭截图"；第 16 条里"语言包未安装时结束截图、换到普通窗口"的做法作废，相关代码已删除）：
+    - 语言包未安装时仍在遮罩上原地执行 `prepareTranslation()`。为了不挡住系统的下载提示，`OCRResultView.onLanguageDownloadActive(true)` 通知 `CaptureOverlayController.yieldToSystemPrompt`：遮罩面板与结果面板临时降到 `.normal` 层级（画面仍在，菜单栏会露出来）；本次翻译结束、结果面板收起或截图结束时恢复为遮罩层级。
+    - `FloatingPanel` 新增 `closesOnResignKey`（默认 true）。遮罩上的结果面板设为 false：系统提示框抢走键盘焦点时面板不能关闭（否则翻译任务会被取消）；面板只在点击定格画面 / 工具条时收起（`overlayViewDidBeginInteraction`）。
+    - 翻译失败且语言包仍未安装时，`OCRResultModel.reportLanguagePackMissing()` 把提示换成具体办法：在系统提示里点「下载」，或手动到 系统设置 → 通用 → 语言与地区 → 翻译语言 下载「英语」和「简体中文」（已测）。
+    - 仍需真机确认：下载提示在降级后的遮罩上是否可见、下载完成后是否需要重新勾选一次。

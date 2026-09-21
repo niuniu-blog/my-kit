@@ -63,8 +63,8 @@ final class CaptureOverlayController: OverlayViewDelegate {
     private var ocrPanel: FloatingPanel?
     private let ocrModel: OCRResultModel
     private static let ocrPanelSize = NSSize(width: 400, height: 440)      // 留出下半部分显示译文
-    /// 翻译需要先下载语言包：结束截图，把已识别的文字交给普通窗口继续。
-    var onContinueInWindow: ((String) -> Void)?
+    /// 系统正在（或即将）显示"下载翻译语言包"的提示：遮罩临时降到普通窗口层级，提示才不会被挡住
+    private var isYieldingToSystemPrompt = false
 
     /// cgWindows：截图那一刻屏幕上的窗口边框（CG 全局坐标，前 → 后）
     init(snapshots: [DisplaySnapshot], cgWindows: [CGRect], settings: ScreenshotSettings = ScreenshotSettings()) {
@@ -186,6 +186,9 @@ final class CaptureOverlayController: OverlayViewDelegate {
 
         let panel = FloatingPanel(size: size)
         panel.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()) + 1)   // 盖在遮罩上面
+        // 系统的下载提示会抢走键盘焦点；面板不能因此关闭（否则翻译到一半就没了）。
+        // 只有点击定格画面 / 工具条时才收起，见 overlayViewDidBeginInteraction。
+        panel.closesOnResignKey = false
         panel.keyHandler = { [weak self, weak panel] event in
             // Esc = 结束整个截图；输入法正在组字时 Esc 交给输入法
             guard event.keyCode == 53, panel?.isComposingText != true else { return false }
@@ -202,7 +205,7 @@ final class CaptureOverlayController: OverlayViewDelegate {
                 model: ocrModel,
                 closeTitle: "完成",
                 onClose: { [weak self] in self?.end() },
-                onNeedsLanguageDownload: { [weak self] in self?.continueInWindow() }
+                onLanguageDownloadActive: { [weak self] active in self?.yieldToSystemPrompt(active) }
             ),
             at: frame
         )
@@ -211,13 +214,23 @@ final class CaptureOverlayController: OverlayViewDelegate {
         }
     }
 
-    private func continueInWindow() {
-        let text = ocrModel.text
-        end()
-        onContinueInWindow?(text)
+    /// 截图画面始终不关闭。需要下载语言包时只是临时让出窗口层级：画面还在，菜单栏会露出来；
+    /// 翻译结束（或面板收起、截图结束）后恢复。
+    private func yieldToSystemPrompt(_ yielding: Bool) {
+        guard yielding != isYieldingToSystemPrompt else { return }
+        isYieldingToSystemPrompt = yielding
+        let shielding = Int(CGShieldingWindowLevel())
+        for entry in entries {
+            entry.panel.level = yielding ? .normal : NSWindow.Level(rawValue: shielding)
+        }
+        ocrPanel?.level = yielding ? .normal : NSWindow.Level(rawValue: shielding + 1)
+        if yielding {
+            ocrPanel?.orderFront(nil)      // 同为普通层级时，保证结果面板仍在定格画面上面
+        }
     }
 
     private func dismissOCRPanel() {
+        yieldToSystemPrompt(false)
         guard let panel = ocrPanel else { return }
         ocrPanel = nil
         panel.onClose = nil

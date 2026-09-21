@@ -156,6 +156,19 @@ import Testing
         #expect(model.translationStatus == "翻译失败：语言包不可用")
     }
 
+    @Test func missingLanguagePackShowsHowToDownloadIt() async throws {
+        let model = makeModel(recognized: "Hello world", prefs: Prefs())
+        await model.run(on: try makeImage())
+        model.setTranslateEnabled(true)
+        await model.runTranslation { _ in throw Boom() }
+
+        model.reportLanguagePackMissing()
+
+        #expect(model.translationStatus.contains("翻译语言"))
+        #expect(model.translationStatus.contains("简体中文"))
+        #expect(!model.isTranslating)
+    }
+
     @Test func disablingClearsTranslationAndForgetsTheChoice() async throws {
         let prefs = Prefs()
         let model = makeModel(recognized: "Hello world", prefs: prefs)
