@@ -52,13 +52,50 @@ public enum MonitorFormat {
     }
 
     /// "CPU 12%  内存 63%" 拆成四段，只有数字那两段可能标红。
-    public static func titleSegments(cpu: Double?, memory: Double?) -> [TitleSegment] {
-        [
+    public static func titleSegments(cpu: Double?, memory: Double?, network: NetworkSpeed? = nil) -> [TitleSegment] {
+        var segments = [
             TitleSegment(text: "CPU ", isWarning: false),
             TitleSegment(text: percent(cpu), isWarning: isWarning(cpu)),
             TitleSegment(text: "  内存 ", isWarning: false),
             TitleSegment(text: percent(memory), isWarning: isWarning(memory)),
         ]
+        if let network {
+            let text = "  ↓" + compactSpeed(network.downBytesPerSecond) + " ↑" + compactSpeed(network.upBytesPerSecond)
+            segments.append(TitleSegment(text: text, isWarning: false))
+        }
+        return segments
+    }
+
+    // MARK: 网速
+
+    /// 菜单里用："56 KB/s"、"1.2 MB/s"、"1.5 GB/s"；nil → "--"。1 KB = 1024 字节。
+    public static func speed(_ bytesPerSecond: Double?) -> String {
+        guard let parts = speedParts(bytesPerSecond) else { return "--" }
+        return parts.number + " " + parts.unit
+    }
+
+    /// 菜单栏用：数字部分固定占 4 位，不足的在前面补"数字空格"（U+2007，和数字一样宽），
+    /// 数字与单位之间不留空格 → 文字宽度基本恒定，菜单栏不会忽宽忽窄。
+    public static func compactSpeed(_ bytesPerSecond: Double) -> String {
+        guard let parts = speedParts(bytesPerSecond) else { return "--" }
+        let padding = String(repeating: "\u{2007}", count: max(0, 4 - parts.number.count))
+        return padding + parts.number + parts.unit
+    }
+
+    private static func speedParts(_ bytesPerSecond: Double?) -> (number: String, unit: String)? {
+        guard let bytesPerSecond, bytesPerSecond.isFinite else { return nil }
+        let kilobytes = max(bytesPerSecond, 0) / 1024
+        if kilobytes < 999.5 {
+            return (String(Int(kilobytes.rounded())), "KB/s")
+        }
+        let megabytes = kilobytes / 1024
+        if megabytes < 99.95 {
+            return (String(format: "%.1f", megabytes), "MB/s")
+        }
+        if megabytes < 999.5 {
+            return (String(Int(megabytes.rounded())), "MB/s")
+        }
+        return (String(format: "%.1f", megabytes / 1024), "GB/s")
     }
 
     private static func roundedPercent(_ value: Double?) -> Int? {

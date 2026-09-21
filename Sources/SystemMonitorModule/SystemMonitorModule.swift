@@ -23,6 +23,7 @@ public final class SystemMonitorModule: NSObject, AppModule {
 
     let cpuHeader = MonitorHeaderView(title: "CPU")
     let memoryHeader = MonitorHeaderView(title: "内存")
+    let networkHeader = MonitorHeaderView(title: "网络")
     let cpuRows: [MonitorRowView] = (0..<TopProcesses.limit).map { _ in MonitorRowView() }
     let memoryRows: [MonitorRowView] = (0..<TopProcesses.limit).map { _ in MonitorRowView() }
     private var cpuRowItems: [NSMenuItem] = []
@@ -93,7 +94,8 @@ public final class SystemMonitorModule: NSObject, AppModule {
         let activityMonitor = NSMenuItem(title: "打开活动监视器…", action: #selector(openActivityMonitor), keyEquivalent: "")
         activityMonitor.target = self
         resetLists()
-        return [viewItem(cpuHeader)] + cpuRowItems + [viewItem(memoryHeader)] + memoryRowItems + [activityMonitor]
+        return [viewItem(cpuHeader)] + cpuRowItems + [viewItem(memoryHeader)] + memoryRowItems
+            + [viewItem(networkHeader), activityMonitor]
     }()
 
     public var settingsView: AnyView? {
@@ -135,13 +137,24 @@ public final class SystemMonitorModule: NSObject, AppModule {
         let memoryDetail = memory.map { MonitorFormat.memorySummary(usedBytes: $0.usedBytes, totalBytes: $0.totalBytes) } ?? ""
         memoryHeader.update(value: MonitorFormat.percent(memory?.percent), detail: memoryDetail, isWarning: MonitorFormat.isWarning(memory?.percent))
 
+        if let network = totals.network {
+            networkHeader.update(
+                value: "↓ " + MonitorFormat.speed(network.downBytesPerSecond),
+                detail: "↑ " + MonitorFormat.speed(network.upBytesPerSecond),
+                isWarning: false)
+        } else {
+            networkHeader.update(value: "--", detail: "", isWarning: false)
+        }
+
         updateMenuBarTitle()
     }
 
     private func updateMenuBarTitle() {
         let totals = engine.lastTotals
         let title: NSAttributedString? = settings.showInMenuBar
-            ? Self.attributedTitle(for: MonitorFormat.titleSegments(cpu: totals.cpu?.total, memory: totals.memory?.percent))
+            ? Self.attributedTitle(for: MonitorFormat.titleSegments(
+                cpu: totals.cpu?.total, memory: totals.memory?.percent,
+                network: settings.showNetworkInMenuBar ? totals.network : nil))
             : nil
         // 内容（文字和颜色）没变就不通知：让菜单栏重新排版文字是平时最贵的一步
         if let title, let current = currentMenuBarTitle, title.isEqual(to: current) { return }

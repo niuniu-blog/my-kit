@@ -168,3 +168,9 @@
 12. 菜单视图尺寸：宽 300pt，标题行 24pt，排行行 20pt，图标 16pt（`AppIconCache`，已测）。
 13. 装机后实测并优化了 MyKit 自身的空闲开销（用 `ps` 的累计 CPU 时间和 `sample` 定位）：优化前约 1.1%（单核），其中系统监控本身只占约 0.1%，其余来自原有的定时任务。两处改动：(a) 菜单栏标题内容（文字 + 颜色）没变时不再通知 `StatusBarController`，避免无谓的文字重排（已测）；(b) `AccessibilityWatcher` 改为自适应间隔 —— 未授权时每 1 秒检查，已授权后每 5 秒（`currentInterval`，已测）。优化后实测约 0.6%（单核），折合整机约 0.05%；常驻内存约 54 MB。
 14. 排查提示：单元测试里的假读取器会故意返回失败，测试进程（`swiftpm-testing-helper`）因此会以同一个日志分类写出"读取 CPU 统计失败"。查看 App 自己的日志要加 `process == "MyKit"` 过滤。
+15. 增加网速显示（用户提出"加个网速，直接显示速度就行"；原先列在"不做"里的"网速"一项就此取消）：
+    - 数据来源：`sysctl(NET_RT_IFLIST2)` 读各网卡 64 位累计收发字节（`NetworkCountersReader`，约 1.3 ms，无需授权）；`HostStatsReading` 增加 `networkCounters()`（协议扩展默认返回 nil）。
+    - 计算：`NetworkSpeed.between(earlier, later, seconds:)` 纯函数（已测）。只统计 `en*` 接口 —— 已在本机确认：本机代理会让同一份流量在 `lo0` 上再出现一遍，VPN 的 `utun*` 流量最终也走 `en0`，都算进去会重复。刚出现的网卡、计数变小（被重置）的网卡该轮跳过；间隔 ≤ 0 返回 nil。
+    - 引擎：`Totals.network`；用可注入的 `clock`（默认 `systemUptime`）计时；读取失败或采样停止时丢弃上一份读数。
+    - 显示：菜单栏标题追加 `  ↓1.2MB/s ↑ 56KB/s`（`MonitorFormat.compactSpeed`：数字固定 4 位、前面补数字空格 U+2007，宽度基本恒定）；还没有两份读数时不显示这一段。菜单里新增「网络」标题行（`↓ 1.2 MB/s` / `↑ 56 KB/s`，`MonitorFormat.speed`），位于内存榜之后、「打开活动监视器…」之前。
+    - 设置：`monitor.showNetworkInMenuBar`（默认开），设置页「同时显示网速」开关；菜单里的「网络」行不受该开关影响。

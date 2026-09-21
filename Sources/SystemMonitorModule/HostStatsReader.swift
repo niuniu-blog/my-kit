@@ -5,6 +5,13 @@ import Foundation
 public protocol HostStatsReading {
     func cpuTicks() -> CPUTicks?
     func memoryUsage() -> MemoryUsage?
+    /// 各网卡的累计收发字节数，用来算网速
+    func networkCounters() -> NetworkCounters?
+}
+
+public extension HostStatsReading {
+    /// 默认没有网络数据（测试里的假实现不必都提供）
+    func networkCounters() -> NetworkCounters? { nil }
 }
 
 /// 直接读 macOS 内核接口（"活动监视器"用的也是这些）。无需任何授权，一次调用是微秒级。
@@ -36,6 +43,10 @@ public struct HostStatsReader: HostStatsReading {
             ))
         }
         return cores.isEmpty ? nil : CPUTicks(cores: cores)
+    }
+
+    public func networkCounters() -> NetworkCounters? {
+        NetworkCountersReader.read()
     }
 
     public func memoryUsage() -> MemoryUsage? {

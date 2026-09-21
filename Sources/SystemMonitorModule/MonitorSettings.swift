@@ -3,6 +3,7 @@ import Foundation
 public struct MonitorSettings {
     public static let showInMenuBarKey = "monitor.showInMenuBar"
     public static let intervalKey = "monitor.interval"
+    public static let showNetworkInMenuBarKey = "monitor.showNetworkInMenuBar"
     public static let allowedIntervals = [1, 2, 5]
     public static let defaultInterval = 2
     /// 设置页改了任何一项之后发出；object = 对应的 UserDefaults
@@ -22,6 +23,18 @@ public struct MonitorSettings {
         }
         nonmutating set {
             defaults.set(newValue, forKey: Self.showInMenuBarKey)
+            notifyChanged()
+        }
+    }
+
+    /// 菜单栏文字里是否带上网速（↓下载 ↑上传）。默认带。只在 showInMenuBar 开着时有意义。
+    public var showNetworkInMenuBar: Bool {
+        get {
+            guard defaults.object(forKey: Self.showNetworkInMenuBarKey) != nil else { return true }
+            return defaults.bool(forKey: Self.showNetworkInMenuBarKey)
+        }
+        nonmutating set {
+            defaults.set(newValue, forKey: Self.showNetworkInMenuBarKey)
             notifyChanged()
         }
     }

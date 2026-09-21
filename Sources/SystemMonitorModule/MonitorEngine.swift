@@ -11,10 +11,13 @@ public final class MonitorEngine {
         /// nil = 还没有两份快照，或读取失败
         public let cpu: CPULoad?
         public let memory: MemoryUsage?
+        /// nil = 还没有两份读数，或读取失败
+        public let network: NetworkSpeed?
 
-        public init(cpu: CPULoad?, memory: MemoryUsage?) {
+        public init(cpu: CPULoad?, memory: MemoryUsage?, network: NetworkSpeed? = nil) {
             self.cpu = cpu
             self.memory = memory
+            self.network = network
         }
     }
 
@@ -48,6 +51,8 @@ public final class MonitorEngine {
     private var timerInterval = 0
     private var isStarted = false
     private var previousTicks: CPUTicks?
+    private var previousNetwork: (counters: NetworkCounters, time: TimeInterval)?
+    private let clock: () -> TimeInterval
     private var lastLoad: CPULoad?
     private var previousSnapshot: ProcessSnapshot?
     /// 每次菜单开 / 关加一：后台采样回来时如果对不上，说明结果已经过时
@@ -62,8 +67,10 @@ public final class MonitorEngine {
         processes: ProcessSampling = ProcessSampler(),
         settings: MonitorSettings = MonitorSettings(),
         firstCPUListDelay: TimeInterval = 1.0,
-        usesTimer: Bool = true
+        usesTimer: Bool = true,
+        clock: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     ) {
+        self.clock = clock
         self.host = host
         self.processes = processes
         self.settings = settings
@@ -142,7 +149,18 @@ public final class MonitorEngine {
             lastLoad = nil
         }
 
-        let totals = Totals(cpu: lastLoad, memory: memory)
+        var network: NetworkSpeed?
+        if let counters = host.networkCounters() {
+            let time = clock()
+            if let previous = previousNetwork {
+                network = NetworkSpeed.between(previous.counters, counters, seconds: time - previous.time)
+            }
+            previousNetwork = (counters, time)
+        } else {
+            previousNetwork = nil          // 读不到：下次从头开始，不拿很久以前的读数来算
+        }
+
+        let totals = Totals(cpu: lastLoad, memory: memory, network: network)
         lastTotals = totals
         onTotals?(totals)
     }
@@ -187,6 +205,7 @@ public final class MonitorEngine {
             // 停止采样后，旧快照和现在隔得太久，下次不能拿来算差值
             previousTicks = nil
             lastLoad = nil
+            previousNetwork = nil
             return
         }
         guard usesTimer else { return }

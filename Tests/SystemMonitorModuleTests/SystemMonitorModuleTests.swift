@@ -82,12 +82,13 @@ private final class StubSampler: ProcessSampling, @unchecked Sendable {
         #expect(module.id == "monitor")
         #expect(module.name == "系统监控")
         #expect(module.settingsView != nil)
-        #expect(items.count == 13)                             // 2 个标题行 + 10 个排行行 + 打开活动监视器
+        #expect(items.count == 14)                             // 3 个标题行 + 10 个排行行 + 打开活动监视器
         #expect(items[0].view === module.cpuHeader)
         #expect(items[6].view === module.memoryHeader)
-        #expect(items[12].title == "打开活动监视器…")
-        #expect(items[12].target != nil)
-        #expect(items[12].action != nil)
+        #expect(items[12].view === module.networkHeader)
+        #expect(items[13].title == "打开活动监视器…")
+        #expect(items[13].target != nil)
+        #expect(items[13].action != nil)
         #expect(FileManager.default.fileExists(atPath: SystemMonitorModule.activityMonitorPath))
     }
 
