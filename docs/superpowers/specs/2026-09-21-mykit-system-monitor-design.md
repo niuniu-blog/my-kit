@@ -174,3 +174,9 @@
     - 引擎：`Totals.network`；用可注入的 `clock`（默认 `systemUptime`）计时；读取失败或采样停止时丢弃上一份读数。
     - 显示：菜单栏标题追加 `  ↓1.2MB/s ↑ 56KB/s`（`MonitorFormat.compactSpeed`：数字固定 4 位、前面补数字空格 U+2007，宽度基本恒定）；还没有两份读数时不显示这一段。菜单里新增「网络」标题行（`↓ 1.2 MB/s` / `↑ 56 KB/s`，`MonitorFormat.speed`），位于内存榜之后、「打开活动监视器…」之前。
     - 设置：`monitor.showNetworkInMenuBar`（默认开），设置页「同时显示网速」开关；菜单里的「网络」行不受该开关影响。
+16. 菜单栏显示改为双行小字 + 可收起（用户反馈"占用右上角太长，缩小间距，再做个伸缩"；用户选了"双行小字"和"在菜单里点收起 / 展开"）：
+    - 文本：`MonitorFormat.titleLines` 返回两行 —— 第一行 `CPU 12%` + `\t↓1.2M`，第二行 `内存 63%` + `\t↑ 56K`；`\t` 是列分隔。`shortSpeed`：省掉 `B/s`，数字最多 3 位（10 以上不带小数），不足补数字空格 U+2007。取代了第 15 条里的单行写法和 `compactSpeed`。菜单里「网络」行仍用完整的 `speed`。
+    - 排版：`SystemMonitorModule.attributedTitle(for:)` —— 9pt medium 等宽数字字体，行高固定 10.5pt（两行 21pt，放得进 22pt 的菜单栏），第二列用制表位对齐（位置 = 较宽的第一列 + 6pt），告警数字 `systemRed`，其余不设颜色。
+    - 绘制：系统的状态栏按钮排不好两行文字，所以由 `Core.StatusItemImage.compose(symbolName:text:)` 把图标和文字画成一张 22pt 高的图交给按钮（`imagePosition = .imageOnly`）。文字里没有颜色 → 模板图（系统按菜单栏深浅自动着色）；有红色告警 → 彩色图，其余部分与图标用 `labelColor`（图标通过符号的调色板配置着色，不用 `sourceAtop` 之类的合成模式，避免直接画到目标时把背景也涂掉）。布局为纯函数 `layout(iconSize:textSize:)`（已测）。
+    - 已离线渲染 8 种组合（浅 / 深 × 普通 / 告警 × 有无网速，外加收起态）人工检查：对齐、清晰度、颜色均正确。宽度：带网速约 104pt（原单行约 250pt），不带网速 64pt，收起 18pt。渲染用的是 `MenuBarPreviewRenderTests`（设置环境变量 `MYKIT_RENDER_DIR` 时才输出 PNG，平时跳过）。
+    - 伸缩：监控模块的菜单最上面新增一项「收起菜单栏数字 / 展开菜单栏数字」，切换的就是 `monitor.showInMenuBar`（与设置页同一个开关）；收起后引擎停止采样。菜单项标题随设置变化更新（含在设置页里改的情况，已测）。

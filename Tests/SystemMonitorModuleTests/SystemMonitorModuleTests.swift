@@ -82,13 +82,14 @@ private final class StubSampler: ProcessSampling, @unchecked Sendable {
         #expect(module.id == "monitor")
         #expect(module.name == "系统监控")
         #expect(module.settingsView != nil)
-        #expect(items.count == 14)                             // 3 个标题行 + 10 个排行行 + 打开活动监视器
-        #expect(items[0].view === module.cpuHeader)
-        #expect(items[6].view === module.memoryHeader)
-        #expect(items[12].view === module.networkHeader)
-        #expect(items[13].title == "打开活动监视器…")
-        #expect(items[13].target != nil)
-        #expect(items[13].action != nil)
+        #expect(items.count == 15)                             // 收起/展开 + 3 个标题行 + 10 个排行行 + 打开活动监视器
+        #expect(items[0].title == "收起菜单栏数字")
+        #expect(items[1].view === module.cpuHeader)
+        #expect(items[7].view === module.memoryHeader)
+        #expect(items[13].view === module.networkHeader)
+        #expect(items[14].title == "打开活动监视器…")
+        #expect(items[14].target != nil)
+        #expect(items[14].action != nil)
         #expect(FileManager.default.fileExists(atPath: SystemMonitorModule.activityMonitorPath))
     }
 
@@ -98,11 +99,11 @@ private final class StubSampler: ProcessSampling, @unchecked Sendable {
         module.onMenuBarTitleChange = { titles.append($0?.string) }
 
         try module.start()
-        #expect(module.currentMenuBarTitle?.string == " CPU --  内存 50%")
+        #expect(module.currentMenuBarTitle?.string == "CPU --\n内存 50%")
 
         await module.engine.tick()
-        #expect(module.currentMenuBarTitle?.string == " CPU 25%  内存 50%")
-        #expect(titles == [" CPU --  内存 50%", " CPU 25%  内存 50%"])       // 内容没变就不重复通知
+        #expect(module.currentMenuBarTitle?.string == "CPU 25%\n内存 50%")
+        #expect(titles == ["CPU --\n内存 50%", "CPU 25%\n内存 50%"])       // 内容没变就不重复通知
     }
 
     @Test func unchangedTitleDoesNotRelayoutTheStatusItem() async throws {
@@ -119,6 +120,42 @@ private final class StubSampler: ProcessSampling, @unchecked Sendable {
         await module.engine.tick()
 
         #expect(notifications == afterFirstValue)
+    }
+
+    @Test func collapseItemHidesTheMenuBarNumbersAndExpandBringsThemBack() throws {
+        let defaults = makeDefaults()
+        let module = makeModule(defaults: defaults)
+        try module.start()
+        let item = module.menuItems[0]
+        #expect(item.title == "收起菜单栏数字")
+        #expect(item.target != nil)
+
+        module.toggleMenuBarDisplay()
+        #expect(module.currentMenuBarTitle == nil)
+        #expect(!MonitorSettings(defaults: defaults).showInMenuBar)       // 和偏好设置里的开关是同一个设置
+        #expect(item.title == "展开菜单栏数字")
+
+        module.toggleMenuBarDisplay()
+        #expect(module.currentMenuBarTitle != nil)
+        #expect(item.title == "收起菜单栏数字")
+    }
+
+    @Test func collapseItemFollowsTheSettingChangedElsewhere() throws {
+        let defaults = makeDefaults()
+        let module = makeModule(defaults: defaults)
+        try module.start()
+        MonitorSettings(defaults: defaults).showInMenuBar = false          // 在偏好设置里关掉
+        #expect(module.menuItems[0].title == "展开菜单栏数字")
+    }
+
+    @Test func menuBarTitleUsesASmallFontSoTwoLinesFitTheMenuBar() throws {
+        let module = makeModule(defaults: makeDefaults())
+        try module.start()
+        let title = try #require(module.currentMenuBarTitle)
+        let font = try #require(title.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        #expect(font.pointSize == 9)
+        let bounds = title.boundingRect(with: NSSize(width: 1000, height: 1000), options: [.usesLineFragmentOrigin])
+        #expect(bounds.height <= 22)                                        // 菜单栏高度
     }
 
     @Test func headersShowTotalsWithDetails() async throws {
@@ -148,7 +185,7 @@ private final class StubSampler: ProcessSampling, @unchecked Sendable {
 
         #expect(cpuColor == NSColor.systemRed)
         #expect(memoryColor == nil)                            // 没到告警线：用菜单栏默认颜色
-        #expect(font == NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular))
+        #expect(font == NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium))
         #expect(module.cpuHeader.valueLabel.textColor == NSColor.systemRed)
         #expect(module.memoryHeader.valueLabel.textColor == NSColor.labelColor)
     }
@@ -177,8 +214,8 @@ private final class StubSampler: ProcessSampling, @unchecked Sendable {
 
         #expect(module.cpuRows[0].nameLabel.stringValue == "正在统计…")
         #expect(module.memoryRows[0].nameLabel.stringValue == "正在统计…")
-        #expect(items[1...5].map(\.isHidden) == [false, true, true, true, true])
-        #expect(items[7...11].map(\.isHidden) == [false, true, true, true, true])
+        #expect(items[2...6].map(\.isHidden) == [false, true, true, true, true])
+        #expect(items[8...12].map(\.isHidden) == [false, true, true, true, true])
     }
 
     @Test func listsShowRankedAppsAndHideUnusedRows() async throws {
@@ -192,12 +229,12 @@ private final class StubSampler: ProcessSampling, @unchecked Sendable {
         #expect(module.cpuRows[0].valueLabel.stringValue == "28.4%")
         #expect(module.cpuRows[0].iconView.image != nil)
         #expect(!module.cpuRows[0].nameLabel.stringValue.isEmpty)
-        #expect(items[1...5].map(\.isHidden) == [false, true, true, true, true])
+        #expect(items[2...6].map(\.isHidden) == [false, true, true, true, true])
         // 内存榜：Finder 3 GB、node 512 MB
         #expect(module.memoryRows[0].valueLabel.stringValue == "3.0 GB")
         #expect(module.memoryRows[1].nameLabel.stringValue == "node")
         #expect(module.memoryRows[1].valueLabel.stringValue == "512 MB")
-        #expect(items[7...11].map(\.isHidden) == [false, false, true, true, true])
+        #expect(items[8...12].map(\.isHidden) == [false, false, true, true, true])
     }
 
     @Test func closingTheMenuStopsProcessSampling() async throws {

@@ -1,4 +1,5 @@
 import AppKit
+import Core
 
 /// 屏幕右上角的 MyKit 图标（以及图标右边可选的一段文字）。
 /// 给 NSStatusItem 设置 menu 后，系统对左键和右键都会弹出同一个菜单。
@@ -10,6 +11,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let onOpenSettings: () -> Void
     private let onMenuWillOpen: () -> Void
     private let onMenuDidClose: () -> Void
+    private var iconState: IconState = .normal
+    private var title: NSAttributedString?
 
     /// moduleMenuItems：各模块的菜单项，已经带好分隔线（见 ModuleRegistry.menuItemsWithSeparators）。
     init(
@@ -39,23 +42,24 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     func setIcon(_ state: IconState) {
-        let symbol = state == .warning ? "exclamationmark.triangle" : "square.stack.3d.up"
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "MyKit")
-        image?.isTemplate = true
-        item.button?.image = image
-        item.button?.appearsDisabled = (state == .paused)
+        iconState = state
+        refresh()
     }
 
-    /// 图标右边的文字（系统监控的 "CPU 12%  内存 63%"）。传 nil 则只显示图标。
+    /// 图标右边的文字（系统监控的两行小字）。传 nil 则只显示图标。
     func setTitle(_ title: NSAttributedString?) {
+        self.title = (title?.length ?? 0) > 0 ? title : nil
+        refresh()
+    }
+
+    /// 图标和文字合成一张图交给状态栏按钮：系统按钮排不好两行文字，自己画才能控制位置和对齐。
+    private func refresh() {
         guard let button = item.button else { return }
-        if let title, title.length > 0 {
-            button.attributedTitle = title
-            button.imagePosition = .imageLeft
-        } else {
-            button.attributedTitle = NSAttributedString()
-            button.imagePosition = .imageOnly
-        }
+        let symbol = iconState == .warning ? "exclamationmark.triangle" : "square.stack.3d.up"
+        button.image = StatusItemImage.compose(symbolName: symbol, text: title)
+        button.imagePosition = .imageOnly
+        button.attributedTitle = NSAttributedString()
+        button.appearsDisabled = (iconState == .paused)
     }
 
     // MARK: NSMenuDelegate

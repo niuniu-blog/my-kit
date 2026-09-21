@@ -83,6 +83,26 @@ public final class SystemMonitorModule: NSObject, AppModule {
 
     // MARK: 菜单与设置
 
+    /// "伸缩"：菜单最上面的「收起菜单栏数字 / 展开菜单栏数字」。和偏好设置里的开关是同一个设置；
+    /// 收起后只剩图标，后台采样也随之停止（菜单打开时照常能看到数据）。
+    private lazy var collapseItem: NSMenuItem = {
+        let item = NSMenuItem(title: "", action: #selector(toggleMenuBarDisplayFromMenu), keyEquivalent: "")
+        item.target = self
+        return item
+    }()
+
+    func toggleMenuBarDisplay() {
+        settings.showInMenuBar.toggle()        // setter 会发变更通知 → 标题、采样、菜单项文字一起更新
+    }
+
+    @objc private func toggleMenuBarDisplayFromMenu() {
+        toggleMenuBarDisplay()
+    }
+
+    private func refreshCollapseItemTitle() {
+        collapseItem.title = settings.showInMenuBar ? "收起菜单栏数字" : "展开菜单栏数字"
+    }
+
     public private(set) lazy var menuItems: [NSMenuItem] = {
         func viewItem(_ view: NSView) -> NSMenuItem {
             let item = NSMenuItem()
@@ -94,7 +114,8 @@ public final class SystemMonitorModule: NSObject, AppModule {
         let activityMonitor = NSMenuItem(title: "打开活动监视器…", action: #selector(openActivityMonitor), keyEquivalent: "")
         activityMonitor.target = self
         resetLists()
-        return [viewItem(cpuHeader)] + cpuRowItems + [viewItem(memoryHeader)] + memoryRowItems
+        refreshCollapseItemTitle()
+        return [collapseItem, viewItem(cpuHeader)] + cpuRowItems + [viewItem(memoryHeader)] + memoryRowItems
             + [viewItem(networkHeader), activityMonitor]
     }()
 
@@ -115,15 +136,33 @@ public final class SystemMonitorModule: NSObject, AppModule {
     // MARK: 显示
 
     /// 菜单栏标题：等宽数字（数值变化时宽度不抖动），达到告警线的数字标红。
-    static func attributedTitle(for segments: [MonitorFormat.TitleSegment]) -> NSAttributedString {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
-        let result = NSMutableAttributedString(string: " ", attributes: [.font: font])      // 和图标之间留一点空
-        for segment in segments {
-            var attributes: [NSAttributedString.Key: Any] = [.font: font]
-            if segment.isWarning {
-                attributes[.foregroundColor] = NSColor.systemRed
+    /// 两行 9pt 小字（等宽数字）。行高压到 10.5pt，两行正好放进 22pt 的菜单栏；
+    /// 第二列（网速）用制表位对齐：位置 = 两行里第一列较宽的那个 + 6pt。告警的数字标红，其余不设颜色。
+    static func attributedTitle(for lines: [[MonitorFormat.TitleSegment]]) -> NSAttributedString {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+        let firstColumnWidth = lines.map { line -> CGFloat in
+            let firstColumn = line.map(\.text).joined().components(separatedBy: "\t")[0]
+            return (firstColumn as NSString).size(withAttributes: [.font: font]).width
+        }.max() ?? 0
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.minimumLineHeight = 10.5
+        paragraph.maximumLineHeight = 10.5
+        paragraph.lineBreakMode = .byClipping
+        paragraph.tabStops = [NSTextTab(textAlignment: .left, location: ceil(firstColumnWidth) + 6)]
+
+        let result = NSMutableAttributedString()
+        for (index, line) in lines.enumerated() {
+            if index > 0 {
+                result.append(NSAttributedString(string: "\n", attributes: [.font: font, .paragraphStyle: paragraph]))
             }
-            result.append(NSAttributedString(string: segment.text, attributes: attributes))
+            for segment in line {
+                var attributes: [NSAttributedString.Key: Any] = [.font: font, .paragraphStyle: paragraph]
+                if segment.isWarning {
+                    attributes[.foregroundColor] = NSColor.systemRed
+                }
+                result.append(NSAttributedString(string: segment.text, attributes: attributes))
+            }
         }
         return result
     }
@@ -150,9 +189,10 @@ public final class SystemMonitorModule: NSObject, AppModule {
     }
 
     private func updateMenuBarTitle() {
+        refreshCollapseItemTitle()
         let totals = engine.lastTotals
         let title: NSAttributedString? = settings.showInMenuBar
-            ? Self.attributedTitle(for: MonitorFormat.titleSegments(
+            ? Self.attributedTitle(for: MonitorFormat.titleLines(
                 cpu: totals.cpu?.total, memory: totals.memory?.percent,
                 network: settings.showNetworkInMenuBar ? totals.network : nil))
             : nil

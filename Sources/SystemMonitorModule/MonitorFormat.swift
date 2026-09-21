@@ -52,18 +52,16 @@ public enum MonitorFormat {
     }
 
     /// "CPU 12%  内存 63%" 拆成四段，只有数字那两段可能标红。
-    public static func titleSegments(cpu: Double?, memory: Double?, network: NetworkSpeed? = nil) -> [TitleSegment] {
-        var segments = [
-            TitleSegment(text: "CPU ", isWarning: false),
-            TitleSegment(text: percent(cpu), isWarning: isWarning(cpu)),
-            TitleSegment(text: "  内存 ", isWarning: false),
-            TitleSegment(text: percent(memory), isWarning: isWarning(memory)),
-        ]
+    /// 菜单栏上的两行小字。第一行 CPU（+ 下载速度），第二行内存（+ 上传速度）。
+    /// 文字里的 "\t" 是列分隔：第二列（网速）在两行里左对齐。
+    public static func titleLines(cpu: Double?, memory: Double?, network: NetworkSpeed?) -> [[TitleSegment]] {
+        var first = [TitleSegment(text: "CPU ", isWarning: false), TitleSegment(text: percent(cpu), isWarning: isWarning(cpu))]
+        var second = [TitleSegment(text: "内存 ", isWarning: false), TitleSegment(text: percent(memory), isWarning: isWarning(memory))]
         if let network {
-            let text = "  ↓" + compactSpeed(network.downBytesPerSecond) + " ↑" + compactSpeed(network.upBytesPerSecond)
-            segments.append(TitleSegment(text: text, isWarning: false))
+            first.append(TitleSegment(text: "\t↓" + shortSpeed(network.downBytesPerSecond), isWarning: false))
+            second.append(TitleSegment(text: "\t↑" + shortSpeed(network.upBytesPerSecond), isWarning: false))
         }
-        return segments
+        return [first, second]
     }
 
     // MARK: 网速
@@ -74,12 +72,13 @@ public enum MonitorFormat {
         return parts.number + " " + parts.unit
     }
 
-    /// 菜单栏用：数字部分固定占 4 位，不足的在前面补"数字空格"（U+2007，和数字一样宽），
-    /// 数字与单位之间不留空格 → 文字宽度基本恒定，菜单栏不会忽宽忽窄。
-    public static func compactSpeed(_ bytesPerSecond: Double) -> String {
+    /// 菜单栏用的短写法："56K"、"1.2M"、"2.5G"（省掉 B/s）。数字部分固定占 3 位，不足的在前面补
+    /// "数字空格"（U+2007，和数字一样宽）→ 宽度基本恒定，菜单栏不会忽宽忽窄。
+    /// 数字最多 3 位（"999"、"1.2"、"128"）：10 以上不带小数。
+    public static func shortSpeed(_ bytesPerSecond: Double) -> String {
         guard let parts = speedParts(bytesPerSecond) else { return "--" }
-        let padding = String(repeating: "\u{2007}", count: max(0, 4 - parts.number.count))
-        return padding + parts.number + parts.unit
+        let padding = String(repeating: "\u{2007}", count: max(0, 3 - parts.number.count))
+        return padding + parts.number + String(parts.unit.prefix(1))
     }
 
     private static func speedParts(_ bytesPerSecond: Double?) -> (number: String, unit: String)? {
@@ -89,13 +88,14 @@ public enum MonitorFormat {
             return (String(Int(kilobytes.rounded())), "KB/s")
         }
         let megabytes = kilobytes / 1024
-        if megabytes < 99.95 {
+        if megabytes < 9.95 {
             return (String(format: "%.1f", megabytes), "MB/s")
         }
         if megabytes < 999.5 {
             return (String(Int(megabytes.rounded())), "MB/s")
         }
-        return (String(format: "%.1f", megabytes / 1024), "GB/s")
+        let gigabytes = megabytes / 1024
+        return (gigabytes < 9.95 ? String(format: "%.1f", gigabytes) : String(Int(gigabytes.rounded())), "GB/s")
     }
 
     private static func roundedPercent(_ value: Double?) -> Int? {

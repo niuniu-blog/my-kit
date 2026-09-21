@@ -76,29 +76,6 @@ import Testing
         let almost = 999.6 * kb
         #expect(MonitorFormat.speed(almost) == "1.0 MB/s")
     }
-
-    @Test func compactSpeedForTheMenuBarHasConstantWidth() {
-        // 数字部分固定占 4 位，不足的用"数字空格"（和数字一样宽）补在前面 → 菜单栏文字不会忽宽忽窄
-        let figureSpace = "\u{2007}"
-        let small = 56 * kb
-        let medium = 1.2 * mb
-        let big = 128 * mb
-        #expect(MonitorFormat.compactSpeed(small) == figureSpace + figureSpace + "56KB/s")
-        #expect(MonitorFormat.compactSpeed(medium) == figureSpace + "1.2MB/s")
-        #expect(MonitorFormat.compactSpeed(big) == figureSpace + "128MB/s")
-        #expect(MonitorFormat.compactSpeed(0) == figureSpace + figureSpace + figureSpace + "0KB/s")
-    }
-
-    @Test func titleGetsNetworkSegmentsOnlyWhenASpeedIsGiven() {
-        let without = MonitorFormat.titleSegments(cpu: 12, memory: 63, network: nil)
-        #expect(without.map(\.text).joined() == "CPU 12%  内存 63%")
-
-        let speed = NetworkSpeed(downBytesPerSecond: 1.2 * mb, upBytesPerSecond: 56 * kb)
-        let with = MonitorFormat.titleSegments(cpu: 12, memory: 63, network: speed)
-        let figureSpace = "\u{2007}"
-        #expect(with.map(\.text).joined() == "CPU 12%  内存 63%  ↓" + figureSpace + "1.2MB/s ↑" + figureSpace + figureSpace + "56KB/s")
-        #expect(with.filter(\.isWarning).isEmpty)                // 网速没有"告警"一说
-    }
 }
 
 @Suite struct NetworkSettingsTests {

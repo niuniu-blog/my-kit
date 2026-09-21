@@ -47,16 +47,44 @@ import Testing
         #expect(!MonitorFormat.isWarning(nil))
     }
 
-    @Test func titleIsFourSegmentsAndOnlyNumbersCanWarn() {
-        let segments = MonitorFormat.titleSegments(cpu: 12, memory: 91)
+    @Test func titleIsTwoLinesAndOnlyNumbersCanWarn() {
+        let lines = MonitorFormat.titleLines(cpu: 12, memory: 91, network: nil)
 
-        #expect(segments.map(\.text) == ["CPU ", "12%", "  内存 ", "91%"])
-        #expect(segments.map(\.isWarning) == [false, false, false, true])
-        #expect(segments.map(\.text).joined() == "CPU 12%  内存 91%")
+        #expect(lines.count == 2)
+        #expect(lines[0].map(\.text) == ["CPU ", "12%"])
+        #expect(lines[1].map(\.text) == ["内存 ", "91%"])
+        #expect(lines[0].map(\.isWarning) == [false, false])
+        #expect(lines[1].map(\.isWarning) == [false, true])
     }
 
     @Test func titleBeforeFirstCPUReadingShowsDashes() {
-        let text = MonitorFormat.titleSegments(cpu: nil, memory: 63).map(\.text).joined()
-        #expect(text == "CPU --  内存 63%")
+        let lines = MonitorFormat.titleLines(cpu: nil, memory: 63, network: nil)
+        #expect(lines[0].map(\.text).joined() == "CPU --")
+        #expect(lines[1].map(\.text).joined() == "内存 63%")
+    }
+
+    @Test func networkSpeedsGoInASecondColumnDownloadOnTopUploadBelow() {
+        let megabyte: Double = 1_048_576
+        let speed = NetworkSpeed(downBytesPerSecond: 1.2 * megabyte, upBytesPerSecond: 56 * 1024)
+        let lines = MonitorFormat.titleLines(cpu: 12, memory: 63, network: speed)
+        let figureSpace = "\u{2007}"
+
+        // "\t" 是列分隔：第二列在两行里左对齐
+        #expect(lines[0].map(\.text).joined() == "CPU 12%\t↓1.2M")
+        #expect(lines[1].map(\.text).joined() == "内存 63%\t↑" + figureSpace + "56K")
+        #expect(lines.joined().filter(\.isWarning).isEmpty)
+    }
+
+    @Test func shortSpeedDropsTheBPerSecondSuffixAndKeepsAConstantWidth() {
+        let figureSpace = "\u{2007}"
+        let megabyte: Double = 1_048_576
+        let big = 128 * megabyte
+        let huge = 2.5 * 1024 * megabyte
+        let twelve = 12.3 * megabyte
+        #expect(MonitorFormat.shortSpeed(0) == figureSpace + figureSpace + "0K")
+        #expect(MonitorFormat.shortSpeed(57_344) == figureSpace + "56K")
+        #expect(MonitorFormat.shortSpeed(twelve) == figureSpace + "12M")      // 10 MB 以上不要小数：数字最多 3 位
+        #expect(MonitorFormat.shortSpeed(big) == "128M")
+        #expect(MonitorFormat.shortSpeed(huge) == "2.5G")
     }
 }
