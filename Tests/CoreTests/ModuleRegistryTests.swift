@@ -27,6 +27,10 @@ private final class FakeModule: AppModule {
     func stop() { log.append("stop") }
 
     var menuItems: [NSMenuItem] { items }
+
+    func menuWillOpen() { log.append("menuWillOpen") }
+
+    func menuDidClose() { log.append("menuDidClose") }
 }
 
 @MainActor
@@ -68,6 +72,65 @@ private final class FakeModule: AppModule {
         registry.register(FakeModule(id: "b", items: [NSMenuItem(title: "B1", action: nil, keyEquivalent: "")]))
 
         #expect(registry.menuItems.map(\.title) == ["A1", "B1"])
+    }
+
+    @Test func separatorFollowsEachModuleThatHasMenuItems() {
+        let registry = ModuleRegistry()
+        registry.register(FakeModule(id: "a", items: [NSMenuItem(title: "A1", action: nil, keyEquivalent: "")]))
+        registry.register(FakeModule(id: "empty"))
+        registry.register(FakeModule(id: "c", items: [
+            NSMenuItem(title: "C1", action: nil, keyEquivalent: ""),
+            NSMenuItem(title: "C2", action: nil, keyEquivalent: ""),
+        ]))
+
+        let described = registry.menuItemsWithSeparators.map { $0.isSeparatorItem ? "---" : $0.title }
+
+        #expect(described == ["A1", "---", "C1", "C2", "---"])
+    }
+
+    @Test func noModulesMeansNoSeparators() {
+        #expect(ModuleRegistry().menuItemsWithSeparators.isEmpty)
+    }
+
+    @Test func menuOpenAndCloseAreForwardedToStartedModulesOnly() {
+        let registry = ModuleRegistry()
+        let bad = FakeModule(id: "bad")
+        bad.shouldFail = true
+        let good = FakeModule(id: "good")
+        registry.register(bad)
+        registry.register(good)
+        registry.startAll()
+
+        registry.menuWillOpen()
+        registry.menuDidClose()
+
+        #expect(good.log == ["start", "menuWillOpen", "menuDidClose"])
+        #expect(bad.log.isEmpty)
+    }
+
+    @Test func menuCallbacksAreNotForwardedAfterStopAll() {
+        let registry = ModuleRegistry()
+        let module = FakeModule(id: "m")
+        registry.register(module)
+        registry.startAll()
+        registry.stopAll()
+
+        registry.menuWillOpen()
+
+        #expect(module.log == ["start", "stop"])
+    }
+
+    @Test func menuCallbacksHaveDefaultNoOpImplementations() {
+        @MainActor final class Bare: AppModule {
+            let id = "bare"
+            let name = "bare"
+            func start() throws {}
+            func stop() {}
+        }
+        let bare = Bare()
+        bare.menuWillOpen()
+        bare.menuDidClose()
+        #expect(bare.menuItems.isEmpty)
     }
 
     @Test func defaultMenuItemsAndSettingsViewAreEmpty() {

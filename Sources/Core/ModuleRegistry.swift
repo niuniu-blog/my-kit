@@ -35,4 +35,25 @@ public final class ModuleRegistry {
     public var menuItems: [NSMenuItem] {
         modules.flatMap(\.menuItems)
     }
+
+    /// 右上角菜单用：按注册顺序排列，每个模块的菜单项后面跟一条分隔线；没有菜单项的模块不占位置。
+    public var menuItemsWithSeparators: [NSMenuItem] {
+        modules.flatMap { module -> [NSMenuItem] in
+            let items = module.menuItems
+            return items.isEmpty ? [] : items + [NSMenuItem.separator()]
+        }
+    }
+
+    /// 右上角菜单即将打开：通知所有成功启动的模块。
+    public func menuWillOpen() {
+        for module in started {
+            module.menuWillOpen()
+        }
+    }
+
+    public func menuDidClose() {
+        for module in started {
+            module.menuDidClose()
+        }
+    }
 }

@@ -41,8 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let settingsWindow = SettingsWindowController(modules: registry.modules)
         self.settingsWindow = settingsWindow
         statusBar = StatusBarController(
-            moduleMenuItems: registry.menuItems,
-            onOpenSettings: { settingsWindow.show() }
+            moduleMenuItems: registry.menuItemsWithSeparators,
+            onOpenSettings: { settingsWindow.show() },
+            onMenuWillOpen: { [weak self] in self?.registry.menuWillOpen() },
+            onMenuDidClose: { [weak self] in self?.registry.menuDidClose() }
         )
 
         eventTap.onDoubleTap = { [weak self] in
