@@ -70,6 +70,8 @@ struct ClipboardPanelView: View {
                 LazyVStack(spacing: 2) {
                     ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, item in
                         ClipboardRowView(
+                            icon: AppIconProvider.shared.icon(forBundleID: item.appBundleID),
+                            sourceName: item.appName ?? "未知应用",
                             summary: item.summary,
                             shortcut: index < 9 ? index + 1 : nil,
                             isSelected: index == viewModel.selectedIndex
@@ -107,12 +109,21 @@ struct ClipboardPanelView: View {
                         .padding(12)
                 }
                 Divider()
-                Text(Self.caption(for: item, now: Date()))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                HStack(spacing: 8) {
+                    Image(nsImage: AppIconProvider.shared.icon(forBundleID: item.appBundleID))
+                        .resizable()
+                        .frame(width: 28, height: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("来自 \(item.appName ?? "未知应用")")
+                            .font(.callout.weight(.medium))
+                        Text(Self.caption(for: item, now: Date()))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -123,17 +134,24 @@ struct ClipboardPanelView: View {
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.unitsStyle = .full
         let when = formatter.localizedString(for: item.lastUsedAt, relativeTo: now)
-        return "来自 \(item.appName ?? "未知应用") · \(when) · \(item.text.count) 个字符"
+        return "\(when) · \(item.text.count) 个字符"
     }
 }
 
 private struct ClipboardRowView: View {
+    /// 来源 App 的图标：一眼看出这条是从哪里复制的
+    let icon: NSImage
+    let sourceName: String
     let summary: String
     let shortcut: Int?
     let isSelected: Bool
 
     var body: some View {
         HStack(spacing: 8) {
+            Image(nsImage: icon)
+                .resizable()
+                .frame(width: 20, height: 20)
+                .help("来自 \(sourceName)")
             Text(summary)
                 .lineLimit(1)
                 .truncationMode(.tail)
