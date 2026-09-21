@@ -2,6 +2,7 @@ import AppKit
 import ClipboardModule
 import Core
 import ScreenshotModule
+import SystemMonitorModule
 import os
 
 @MainActor
@@ -15,11 +16,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let onboarding = OnboardingWindowController()
     private var clipboard: ClipboardModule?
     private var screenshot: ScreenshotModule?
+    private var monitor: SystemMonitorModule?
     private var statusBar: StatusBarController?
     private var settingsWindow: SettingsWindowController?
     private var eventTapFailed = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 系统监控最先注册：它的菜单项（CPU / 内存和排行榜）因此排在菜单最上面
+        let monitor = SystemMonitorModule()
+        monitor.onMenuBarTitleChange = { [weak self] title in
+            self?.statusBar?.setTitle(title)
+        }
+        registry.register(monitor)
+        self.monitor = monitor
+
         do {
             let clipboard = try ClipboardModule(databaseURL: ClipboardModule.defaultDatabaseURL)
             clipboard.onPausedChange = { [weak self] _ in self?.refreshIcon() }
@@ -38,7 +48,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             log.error("模块 \(failure.id, privacy: .public) 启动失败: \(String(describing: failure.error), privacy: .public)")
         }
 
-        let settingsWindow = SettingsWindowController(modules: registry.modules)
+        // 偏好设置里的顺序：剪切板、截图在前，系统监控放最后
+        let settingsModules = registry.modules.filter { $0 !== monitor } + [monitor]
+        let settingsWindow = SettingsWindowController(modules: settingsModules)
         self.settingsWindow = settingsWindow
         statusBar = StatusBarController(
             moduleMenuItems: registry.menuItemsWithSeparators,
@@ -46,6 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onMenuWillOpen: { [weak self] in self?.registry.menuWillOpen() },
             onMenuDidClose: { [weak self] in self?.registry.menuDidClose() }
         )
+        // 模块启动时状态栏还没创建，第一次的标题在这里补上
+        statusBar?.setTitle(monitor.currentMenuBarTitle)
 
         eventTap.onDoubleTap = { [weak self] in
             self?.clipboard?.togglePanel()

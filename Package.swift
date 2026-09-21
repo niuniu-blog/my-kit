@@ -13,7 +13,10 @@ let package = Package(
         ),
         .target(name: "ScreenshotModule", dependencies: ["Core"]),
         .target(name: "SystemMonitorModule", dependencies: ["Core"]),
-        .executableTarget(name: "MyKit", dependencies: ["Core", "ClipboardModule", "ScreenshotModule"]),
+        .executableTarget(
+            name: "MyKit",
+            dependencies: ["Core", "ClipboardModule", "ScreenshotModule", "SystemMonitorModule"]
+        ),
         .testTarget(name: "CoreTests", dependencies: ["Core"]),
         .testTarget(name: "ClipboardModuleTests", dependencies: ["ClipboardModule"]),
         .testTarget(name: "ScreenshotModuleTests", dependencies: ["ScreenshotModule"]),
