@@ -49,11 +49,14 @@ public final class FloatingPanel: NSPanel {
         return NSRect(x: x, y: y, width: size.width, height: size.height)
     }
 
-    public func present<Content: View>(_ view: Content) {
+    /// frame 为 nil 时放在鼠标所在屏幕的中央偏上；否则用给定的位置（AppKit 全局坐标）。
+    public func present<Content: View>(_ view: Content, at frame: NSRect? = nil) {
         contentView = NSHostingView(rootView: view)
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
-        if let screen {
+        if let frame {
+            setFrame(frame, display: true)
+        } else if let screen {
             setFrame(Self.frame(for: panelSize, inVisibleFrame: screen.visibleFrame), display: true)
         }
         orderFrontRegardless()

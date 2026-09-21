@@ -27,7 +27,7 @@ final class OCRResultWindowController {
             window.title = "识别结果"
             window.isReleasedWhenClosed = false
             window.contentMinSize = NSSize(width: 320, height: 200)
-            window.contentView = NSHostingView(rootView: OCRResultView(model: model, onClose: { [weak window] in
+            window.contentView = NSHostingView(rootView: OCRResultView(model: model, closeTitle: "关闭", onClose: { [weak window] in
                 window?.close()
             }))
             window.center()
@@ -38,8 +38,10 @@ final class OCRResultWindowController {
     }
 }
 
-private struct OCRResultView: View {
+/// 识别结果的内容：可编辑的文本 + 状态 + 按钮。普通窗口（贴图右键发起）和截图遮罩上的面板共用。
+struct OCRResultView: View {
     @ObservedObject var model: OCRResultModel
+    let closeTitle: String
     let onClose: () -> Void
 
     var body: some View {
@@ -60,7 +62,7 @@ private struct OCRResultView: View {
                 Spacer()
                 Button("重新复制") { model.copyCurrentText() }
                     .disabled(model.text.isEmpty)
-                Button("关闭", action: onClose)
+                Button(closeTitle, action: onClose)
                     .keyboardShortcut(.cancelAction)
             }
             .padding(12)

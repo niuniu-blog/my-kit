@@ -1,4 +1,5 @@
 import AppKit
+import Core
 
 /// 盖住整块屏幕的面板。和剪切板面板一样：能接收键盘，但不会让 MyKit 变成前台 App。
 final class OverlayPanel: NSPanel {
@@ -58,6 +59,14 @@ final class CaptureOverlayController: OverlayViewDelegate {
     private var entries: [Entry] = []
     private var hasEnded = false
 
+    /// 识别文字时遮罩不关闭：结果面板浮在遮罩上面、选区旁边，方便对照原图。
+    private var ocrPanel: FloatingPanel?
+    private let ocrModel = OCRResultModel(
+        recognize: { try await TextRecognizer.recognize($0) },
+        copy: { PasteService.writeFromMyKit($0) }
+    )
+    private static let ocrPanelSize = NSSize(width: 380, height: 300)
+
     /// cgWindows：截图那一刻屏幕上的窗口边框（CG 全局坐标，前 → 后）
     init(snapshots: [DisplaySnapshot], cgWindows: [CGRect]) {
         entries = snapshots.map { snapshot in
@@ -102,6 +111,7 @@ final class CaptureOverlayController: OverlayViewDelegate {
     func end() {
         guard !hasEnded else { return }
         hasEnded = true
+        dismissOCRPanel()
         for entry in entries {
             entry.panel.keyHandler = nil
             entry.panel.contentView = nil      // 立刻释放定格画面
@@ -115,6 +125,7 @@ final class CaptureOverlayController: OverlayViewDelegate {
     // MARK: OverlayViewDelegate
 
     func overlayViewDidBeginInteraction(_ view: OverlayView) {
+        dismissOCRPanel()                      // 点一下定格画面 = 收起识别结果，继续截图
         for entry in entries where entry.view !== view {
             entry.view.resetSelection()        // 同一时间只有一块屏上有选区
         }
@@ -153,8 +164,52 @@ final class CaptureOverlayController: OverlayViewDelegate {
                   let selection = entry.view.model.selection,
                   let result = CaptureResult.make(selection: selection, snapshot: entry.snapshot)
             else { return }                     // 还没有选区：按键无效果
+            if action == .recognize {
+                showRecognition(of: result, selection: selection, in: entry)   // 遮罩保持打开
+                return
+            }
             end()
             onFinish?(action, result)
         }
+    }
+
+    // MARK: 识别文字（遮罩不关闭）
+
+    private func showRecognition(of result: CaptureResult, selection: CGRect, in entry: Entry) {
+        dismissOCRPanel()
+        let size = Self.ocrPanelSize
+        let origin = ToolbarPlacement.sidePanelOrigin(panelSize: size, selection: selection, bounds: entry.snapshot.localBounds)
+        let frame = ScreenGeometry.appKitRect(
+            fromLocal: CGRect(origin: origin, size: size),
+            screenFrame: entry.snapshot.screen.frame
+        )
+
+        let panel = FloatingPanel(size: size)
+        panel.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()) + 1)   // 盖在遮罩上面
+        panel.keyHandler = { [weak self, weak panel] event in
+            // Esc = 结束整个截图；输入法正在组字时 Esc 交给输入法
+            guard event.keyCode == 53, panel?.isComposingText != true else { return false }
+            self?.end()
+            return true
+        }
+        // 面板失去焦点（用户点了定格画面）时会自己关闭
+        panel.onClose = { [weak self, weak panel] in
+            if self?.ocrPanel === panel { self?.ocrPanel = nil }
+        }
+        ocrPanel = panel
+        panel.present(
+            OCRResultView(model: ocrModel, closeTitle: "完成", onClose: { [weak self] in self?.end() }),
+            at: frame
+        )
+        Task { [ocrModel] in
+            await ocrModel.run(on: result.image)
+        }
+    }
+
+    private func dismissOCRPanel() {
+        guard let panel = ocrPanel else { return }
+        ocrPanel = nil
+        panel.onClose = nil
+        panel.close()
     }
 }

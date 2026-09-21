@@ -30,4 +30,31 @@ public enum ToolbarPlacement {
         }
         return CGPoint(x: x + gap, y: selection.minY + gap)
     }
+
+    /// 识别结果面板放在选区旁边，方便对照原图：右 → 左 → 下 → 上 → 选区内右下角。始终完整落在屏幕内。
+    public static func sidePanelOrigin(panelSize: CGSize, selection: CGRect, bounds: CGRect, gap: CGFloat = 12) -> CGPoint {
+        func clampX(_ x: CGFloat) -> CGFloat { min(max(x, bounds.minX), max(bounds.maxX - panelSize.width, bounds.minX)) }
+        func clampY(_ y: CGFloat) -> CGFloat { min(max(y, bounds.minY), max(bounds.maxY - panelSize.height, bounds.minY)) }
+
+        let right = selection.maxX + gap
+        if right + panelSize.width <= bounds.maxX {
+            return CGPoint(x: right, y: clampY(selection.minY))
+        }
+        let left = selection.minX - gap - panelSize.width
+        if left >= bounds.minX {
+            return CGPoint(x: left, y: clampY(selection.minY))
+        }
+        let below = selection.maxY + gap
+        if below + panelSize.height <= bounds.maxY {
+            return CGPoint(x: clampX(selection.minX), y: below)
+        }
+        let above = selection.minY - gap - panelSize.height
+        if above >= bounds.minY {
+            return CGPoint(x: clampX(selection.minX), y: above)
+        }
+        return CGPoint(
+            x: clampX(min(selection.maxX, bounds.maxX) - gap - panelSize.width),
+            y: clampY(min(selection.maxY, bounds.maxY) - gap - panelSize.height)
+        )
+    }
 }
