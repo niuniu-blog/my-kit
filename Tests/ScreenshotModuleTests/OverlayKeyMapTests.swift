@@ -1,0 +1,33 @@
+import AppKit
+import Testing
+@testable import ScreenshotModule
+
+@Suite struct OverlayKeyMapTests {
+    @Test func escapeCancelsRegardlessOfModifiers() {
+        #expect(OverlayKeyMap.command(keyCode: 53, characters: "\u{1b}", modifiers: []) == .cancel)
+        #expect(OverlayKeyMap.command(keyCode: 53, characters: "\u{1b}", modifiers: [.shift]) == .cancel)
+    }
+
+    @Test func returnAndKeypadEnterCopy() {
+        #expect(OverlayKeyMap.command(keyCode: 36, characters: "\r", modifiers: []) == .perform(.copy))
+        #expect(OverlayKeyMap.command(keyCode: 76, characters: "\u{03}", modifiers: [.numericPad]) == .perform(.copy))
+    }
+
+    @Test func commandLettersMapToActions() {
+        #expect(OverlayKeyMap.command(keyCode: 8, characters: "c", modifiers: [.command]) == .perform(.copy))
+        #expect(OverlayKeyMap.command(keyCode: 1, characters: "s", modifiers: [.command]) == .perform(.save))
+        #expect(OverlayKeyMap.command(keyCode: 15, characters: "r", modifiers: [.command]) == .perform(.recognize))
+        #expect(OverlayKeyMap.command(keyCode: 17, characters: "t", modifiers: [.command]) == .perform(.pin))
+    }
+
+    @Test func capsLockDoesNotBreakShortcuts() {
+        #expect(OverlayKeyMap.command(keyCode: 1, characters: "S", modifiers: [.command, .capsLock]) == .perform(.save))
+    }
+
+    @Test func lettersWithoutCommandOrWithExtraModifiersDoNothing() {
+        #expect(OverlayKeyMap.command(keyCode: 1, characters: "s", modifiers: []) == nil)
+        #expect(OverlayKeyMap.command(keyCode: 1, characters: "s", modifiers: [.command, .shift]) == nil)
+        #expect(OverlayKeyMap.command(keyCode: 36, characters: "\r", modifiers: [.command]) == nil)
+        #expect(OverlayKeyMap.command(keyCode: 0, characters: "a", modifiers: [.command]) == nil)
+    }
+}
