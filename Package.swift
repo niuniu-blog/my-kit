@@ -16,7 +16,7 @@ let package = Package(
         .target(name: "UninstallerModule", dependencies: ["Core"]),
         .executableTarget(
             name: "MyKit",
-            dependencies: ["Core", "ClipboardModule", "ScreenshotModule", "SystemMonitorModule"]
+            dependencies: ["Core", "ClipboardModule", "ScreenshotModule", "SystemMonitorModule", "UninstallerModule"]
         ),
         .testTarget(name: "CoreTests", dependencies: ["Core"]),
         .testTarget(name: "ClipboardModuleTests", dependencies: ["ClipboardModule"]),

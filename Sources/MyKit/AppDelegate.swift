@@ -3,6 +3,7 @@ import ClipboardModule
 import Core
 import ScreenshotModule
 import SystemMonitorModule
+import UninstallerModule
 import os
 
 @MainActor
@@ -17,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var clipboard: ClipboardModule?
     private var screenshot: ScreenshotModule?
     private var monitor: SystemMonitorModule?
+    private var uninstaller: UninstallerModule?
     private var statusBar: StatusBarController?
     private var settingsWindow: SettingsWindowController?
     private var eventTapFailed = false
@@ -42,6 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let screenshot = ScreenshotModule()
         registry.register(screenshot)
         self.screenshot = screenshot
+
+        // 卸载器：只有一个菜单项，窗口打开时才工作，平时零开销
+        let uninstaller = UninstallerModule()
+        registry.register(uninstaller)
+        self.uninstaller = uninstaller
 
         registry.startAll()
         for failure in registry.failures {

@@ -24,5 +24,7 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>卸载软件时，需要管理员权限的文件要请访达来移到废纸篓。</string>
 </dict>
 </plist>
