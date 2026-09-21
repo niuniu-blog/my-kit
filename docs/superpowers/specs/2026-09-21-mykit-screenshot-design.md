@@ -218,3 +218,12 @@
     - 点一下定格画面（或工具条）→ 面板失去焦点自动收起，回到截图状态：可以调整选区再次识别，或继续复制 / 保存 / 贴图。
     - 从贴图右键菜单发起的识别没有遮罩，仍用 §2.5 的普通窗口；两处共用 `OCRResultView`（关闭按钮的文字可配置）。
     - `FloatingPanel.present` 增加可选参数 `at frame:`，用于指定位置。
+16. 识别结果可翻译成中文（用户提出"识别的时候增加一个翻译，增加个选项，翻译成中文，识别英文就行"）：
+    - 引擎：系统 `Translation` 框架（macOS 15+，离线、免费、无第三方依赖），固定 英文 → 简体中文。已在本机验证：CLT 下可编译；该语言对状态为 supported（语言包未下载）。macOS 14 上不显示该选项（`#available`）。
+    - 界面：`OCRResultView` 增加「翻译成中文」勾选框；勾上后下半部分显示译文（可选中 / 编辑），按钮变为「复制译文」「复制原文」。勾选状态存 `screenshot.autoTranslate`，勾上后每次识别完自动翻译。译文不自动进剪切板（原文仍自动复制）。
+    - 状态在 `OCRResultModel`（已测）：`translateEnabled`、`translation`、`translationStatus`、`isTranslating`、`translationRequestID`；`setTranslateEnabled`、`requestTranslation`、`runTranslation(_:)`（翻译函数注入）、`copyTranslation`、`adopt(text:)`、`cancelPendingTranslation`。没有英文（`TranslationText.containsEnglish`：连续 ≥ 2 个英文字母）→ 提示"没有可翻译的英文"，不发请求。
+    - 段落合并（`TranslationText.paragraphs`，已测）：截图里的段落被换行切碎，逐行翻译质量差。上一行未以句末标点结尾、且长度 ≥ max(最长行 × 0.6, 25 字符) 时与下一行用空格合并；空行分段；菜单项 / 标题等短行不合并。每段一个 `TranslationSession.Request`，译文按段用换行连接。
+    - 执行：视图修饰器 `TranslationRunner` 用 `.translationTask` 取得会话，先 `prepareTranslation()`（需要时系统提示下载语言包）再 `translations(from:)`。
+    - 语言包未安装且处在截图遮罩上时：系统的下载提示可能被全屏遮罩挡住，所以先用 `LanguageAvailability` 检查，未安装则结束截图，经 `onContinueInWindow` 把已识别的文字交给普通的识别结果窗口（`OCRResultWindowController.continueWith(text:)`）在那里下载并翻译。
+    - 面板尺寸改为 400×440，普通窗口改为 480×460，给译文留出空间。
+    - 未能自动验证（需要真机操作）：语言包下载提示的实际表现、`.translationTask` 在不激活 App 的面板里的表现、译文质量。

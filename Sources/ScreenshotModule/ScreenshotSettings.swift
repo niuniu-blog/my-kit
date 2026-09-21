@@ -2,6 +2,7 @@ import Foundation
 
 public struct ScreenshotSettings {
     public static let saveFolderKey = "screenshot.saveFolder"
+    public static let autoTranslateKey = "screenshot.autoTranslate"
 
     private let defaults: UserDefaults
 
@@ -24,5 +25,11 @@ public struct ScreenshotSettings {
         nonmutating set {
             defaults.set(newValue.path, forKey: Self.saveFolderKey)
         }
+    }
+
+    /// 识别结果面板上"翻译成中文"的勾选状态：勾上后每次识别完自动翻译，直到取消。
+    public var autoTranslate: Bool {
+        get { defaults.bool(forKey: Self.autoTranslateKey) }
+        nonmutating set { defaults.set(newValue, forKey: Self.autoTranslateKey) }
     }
 }

@@ -61,14 +61,14 @@ final class CaptureOverlayController: OverlayViewDelegate {
 
     /// 识别文字时遮罩不关闭：结果面板浮在遮罩上面、选区旁边，方便对照原图。
     private var ocrPanel: FloatingPanel?
-    private let ocrModel = OCRResultModel(
-        recognize: { try await TextRecognizer.recognize($0) },
-        copy: { PasteService.writeFromMyKit($0) }
-    )
-    private static let ocrPanelSize = NSSize(width: 380, height: 300)
+    private let ocrModel: OCRResultModel
+    private static let ocrPanelSize = NSSize(width: 400, height: 440)      // 留出下半部分显示译文
+    /// 翻译需要先下载语言包：结束截图，把已识别的文字交给普通窗口继续。
+    var onContinueInWindow: ((String) -> Void)?
 
     /// cgWindows：截图那一刻屏幕上的窗口边框（CG 全局坐标，前 → 后）
-    init(snapshots: [DisplaySnapshot], cgWindows: [CGRect]) {
+    init(snapshots: [DisplaySnapshot], cgWindows: [CGRect], settings: ScreenshotSettings = ScreenshotSettings()) {
+        ocrModel = OCRResultModel.live(settings: settings)
         entries = snapshots.map { snapshot in
             let panel = OverlayPanel(screenFrame: snapshot.screen.frame)
             let localBounds = snapshot.localBounds
@@ -198,12 +198,23 @@ final class CaptureOverlayController: OverlayViewDelegate {
         }
         ocrPanel = panel
         panel.present(
-            OCRResultView(model: ocrModel, closeTitle: "完成", onClose: { [weak self] in self?.end() }),
+            OCRResultView(
+                model: ocrModel,
+                closeTitle: "完成",
+                onClose: { [weak self] in self?.end() },
+                onNeedsLanguageDownload: { [weak self] in self?.continueInWindow() }
+            ),
             at: frame
         )
         Task { [ocrModel] in
             await ocrModel.run(on: result.image)
         }
+    }
+
+    private func continueInWindow() {
+        let text = ocrModel.text
+        end()
+        onContinueInWindow?(text)
     }
 
     private func dismissOCRPanel() {

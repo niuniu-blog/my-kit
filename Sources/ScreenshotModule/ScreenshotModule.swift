@@ -80,9 +80,13 @@ public final class ScreenshotModule: NSObject, AppModule {
         isStarting = false
         switch outcome {
         case .success(let snapshots):
-            let controller = CaptureOverlayController(snapshots: snapshots, cgWindows: windows)
+            let controller = CaptureOverlayController(
+                snapshots: snapshots, cgWindows: windows, settings: ScreenshotSettings(defaults: defaults))
             controller.onFinish = { [weak self] action, result in
                 self?.actions.perform(action, image: result.image, pointSize: result.pointSize, screenRect: result.screenRect)
+            }
+            controller.onContinueInWindow = { [weak self] text in
+                self?.actions.continueRecognitionInWindow(text: text)
             }
             controller.onEnd = { [weak self] in
                 self?.session = nil
