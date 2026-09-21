@@ -1,6 +1,7 @@
 import AppKit
 import ClipboardModule
 import Core
+import ScreenshotModule
 import os
 
 @MainActor
@@ -11,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let accessibilityWatcher = AccessibilityWatcher()
     private let onboarding = OnboardingWindowController()
     private var clipboard: ClipboardModule?
+    private var screenshot: ScreenshotModule?
     private var statusBar: StatusBarController?
     private var settingsWindow: SettingsWindowController?
     private var eventTapFailed = false
@@ -24,6 +26,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             log.error("剪切板模块初始化失败: \(String(describing: error), privacy: .public)")
         }
+
+        let screenshot = ScreenshotModule()
+        registry.register(screenshot)
+        self.screenshot = screenshot
 
         registry.startAll()
         for failure in registry.failures {
@@ -39,6 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         eventTap.onDoubleTap = { [weak self] in
             self?.clipboard?.togglePanel()
+        }
+        eventTap.register(.controlCommandA) { [weak self] in
+            self?.screenshot?.startCapture()
         }
         accessibilityWatcher.onChange = { [weak self] trusted in
             self?.accessibilityChanged(trusted)

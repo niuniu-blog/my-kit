@@ -1,7 +1,7 @@
 # MyKit 设计文档：截图模块（第一期）
 
 日期：2026-09-21
-状态：设计已确认，待写实现计划
+状态：已实现（实现计划：`docs/superpowers/plans/2026-09-21-mykit-screenshot.md`）
 前置：`2026-09-21-mykit-clipboard-design.md`（外壳 + 剪切板，已实现）
 
 ## 1. 目标与范围
@@ -34,7 +34,7 @@
 
 ### 2.1 开始截图
 
-按 `⌃⌘A`（或点菜单栏图标 →「截图」）→ 所有显示器的画面同时定格并略微变暗，鼠标变成十字。截图进行中再按 `⌃⌘A` 无效果。
+按 `⌃⌘A`（或点菜单栏图标 →「截图」）→ 所有显示器的画面同时定格并略微变暗，鼠标变成十字。截图进行中再按一次 `⌃⌘A` = 直接退出截图（保底退出：走全局键盘监听，不依赖遮罩拿到键盘焦点）。
 
 ### 2.2 选区
 
@@ -183,10 +183,25 @@
 | 某块屏截取失败 | 跳过该屏，其余照常 |
 | 保存失败 | §2.4 的回退 |
 | OCR 失败 / 无文字 | §2.5 |
-| 截图进行中再次触发 | 忽略 |
+| 截图进行中再次触发 | 遮罩已显示 → 结束本次截图（保底退出）；还在定格画面 → 忽略 |
 
 ## 7. 测试
 
 自动化（Swift Testing）：`KeyComboMatcher`、`PasteService` 新方法、`ClipboardMonitor` 来源标记、`WindowLocator` 纯函数、`SelectionModel`（悬停、单击选窗、拖出选区、移动、8 个手柄缩放、边界夹取、最小尺寸、两级取消）、`ToolbarPlacement`、`ImageCropper`（含 2× 缩放与越界）、`ScreenshotFileNamer`、`ScreenshotSaver`（含回退）、`ScreenshotSettings`、`TextRecognizer`（生成中英文图片做真实识别；空白图片返回空）、`PinZoom`、`ScreenshotModule` 身份与菜单项。
 
 手动验收清单（实现计划的最后一个任务里逐条列出）：授权引导与重启、`⌃⌘A` 触发与吞键、微信冲突实测、窗口高亮与单击选窗、框选 / 移动 / 缩放、工具条位置、五个操作及其快捷键、两级取消、多显示器、Retina 清晰度、贴图的拖动 / 缩放 / 右键菜单 / 多张 / 全屏 App 上显示、OCR 结果窗口的编辑与重新复制、OCR 文字在剪切板历史里来源显示为 MyKit、保存文件夹设置与回退、截图结束后内存回落。
+
+## 8. 实现阶段的细化（写计划并编译验证时确定）
+
+1. §4.1：`KeyComboMatcher.matches` 不含"是否自动重复"参数；`GlobalKeyTap` 对自动重复的按键同样吞掉，但只在第一次按下时调用 handler。
+2. §4.1：`Core` 新增 `ImageEncoding`（带 DPI 的 PNG / TIFF 编码），`PasteService.write(image:)` 与 `ScreenshotSaver` 共用。
+3. §4.2：`DisplaySnapshot` 实际为 `{ screen: ScreenDescriptor, image }`，带 `localBounds` 与 `imageScale`；裁剪与换算回 AppKit 全局坐标放在新增的 `CaptureResult.make`。
+4. §4.2：新增小单元 `CaptureAction`、`OverlayCommand`、`OverlayKeyMap`（已测）、`CaptureToolbar`、`OCRResultModel`（已测，识别与复制均为注入）、`ScreenshotActions.message(for:)`。
+5. §2.2：已有选区时，在选区外**拖动**会开始画新选区；在选区外**单击**则保留原选区。`SelectionModel` 增加 `hasConfirmedSelection` 与 `reset()`。
+6. §2.5：同一视觉行上的多个识别片段用空格连接，行与行之间用换行连接。
+7. 鼠标离开某块屏时清除该屏上的窗口高亮；同一时间只有一块屏上有选区。
+8. 从菜单栏菜单触发截图时延迟 0.25 秒，避免把菜单本身截进去。
+9. 截图期间遮罩面板吞掉所有键盘事件（不会传给下面的 App，也不会发出系统提示音）。
+10. 保底退出：遮罩显示期间再按 `⌃⌘A` 直接结束截图（走全局键盘监听，不依赖遮罩的键盘焦点）。
+11. 用户已取消微信和钉钉的截图快捷键，§3 的冲突实测不再需要；README 保留一句提示，供日后分享给他人时参考。
+12. 环境发现：Swift Testing 的 `#expect` 里不能直接写字面量算术（如 `x == 1600 - 16`），需先用 `let` 算好；Vision 在新进程身份下首次识别约 20–25 秒，之后约 0.3 秒。

@@ -12,7 +12,7 @@ let package = Package(
             linkerSettings: [.linkedLibrary("sqlite3")]
         ),
         .target(name: "ScreenshotModule", dependencies: ["Core"]),
-        .executableTarget(name: "MyKit", dependencies: ["Core", "ClipboardModule"]),
+        .executableTarget(name: "MyKit", dependencies: ["Core", "ClipboardModule", "ScreenshotModule"]),
         .testTarget(name: "CoreTests", dependencies: ["Core"]),
         .testTarget(name: "ClipboardModuleTests", dependencies: ["ClipboardModule"]),
         .testTarget(name: "ScreenshotModuleTests", dependencies: ["ScreenshotModule"]),

@@ -3996,7 +3996,13 @@ public final class ScreenshotModule: NSObject, AppModule {
 
     /// 开始一次截图（⌃⌘A 或菜单）。没有"屏幕录制"授权时改为弹出引导窗口。
     public func startCapture() {
-        guard session == nil, !isStarting else { return }     // 截图进行中再次触发：忽略
+        if let session {
+            // 保底退出：截图进行中再按一次 ⌃⌘A 直接结束截图。这条路走全局键盘监听，
+            // 不依赖遮罩面板拿到键盘焦点，所以即使 Esc 失灵屏幕也不会被卡住。
+            session.end()
+            return
+        }
+        guard !isStarting else { return }                      // 正在定格画面：忽略
         guard Permissions.isScreenRecordingGranted else {
             Permissions.requestScreenRecording()              // 让 MyKit 出现在系统设置的列表里
             guide.show()
@@ -4340,7 +4346,7 @@ Expected: 打印进程号和 `MyKit 正在运行`；日志里有 `MyKit 已启�
 4. 在"文本编辑"里打字时按 `⌃⌘A`，然后按 `Esc`。→ 文档里**没有**多出任何字符，也没有"咚"的提示音（按键被 MyKit 吞掉了）。
 5. 点右上角 MyKit 图标 →「截图」（菜单项右边显示 ⌃⌘A）。→ 同样进入截图，而且截到的画面里**没有**那个菜单。
 6. 微信冲突实测：打开微信并登录，确认微信「设置 → 快捷键 → 截取屏幕」是 `⌃⌘A`。按 `⌃⌘A`。→ 记下出现的是谁的截图界面：只出现 MyKit 的 = 最好；出现微信的、或两个都出现 = 按 README「和微信抢快捷键？」一节，到微信里关掉或改掉它的快捷键，再试一次应只出现 MyKit 的。把实测结果写进本任务的提交信息里。
-7. 截图进行中再按一次 `⌃⌘A`。→ 没有任何变化（不会叠出第二层遮罩）。
+7. 截图进行中再按一次 `⌃⌘A`。→ 直接退出截图，屏幕恢复正常（保底退出；不会叠出第二层遮罩）。
 
 **C. 选区**
 
