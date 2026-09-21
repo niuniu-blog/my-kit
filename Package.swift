@@ -11,9 +11,11 @@ let package = Package(
             dependencies: ["Core"],
             linkerSettings: [.linkedLibrary("sqlite3")]
         ),
+        .target(name: "ScreenshotModule", dependencies: ["Core"]),
         .executableTarget(name: "MyKit", dependencies: ["Core", "ClipboardModule"]),
         .testTarget(name: "CoreTests", dependencies: ["Core"]),
         .testTarget(name: "ClipboardModuleTests", dependencies: ["ClipboardModule"]),
+        .testTarget(name: "ScreenshotModuleTests", dependencies: ["ScreenshotModule"]),
     ],
     swiftLanguageModes: [.v5]
 )
