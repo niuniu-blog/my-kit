@@ -18,4 +18,9 @@ import Testing
         #expect(ScreenshotActions.message(for: .savedToFallback(URL(fileURLWithPath: "/tmp/a.png"))) == "保存失败，已改存到桌面")
         #expect(ScreenshotActions.message(for: .failed) == "保存失败")
     }
+
+    @Test func droppedAnnotationsGetAFollowUpMessage() {
+        #expect(ScreenshotActions.followUpMessage(annotationsDropped: true) == "标注未能合成，已输出原图")
+        #expect(ScreenshotActions.followUpMessage(annotationsDropped: false) == nil)
+    }
 }

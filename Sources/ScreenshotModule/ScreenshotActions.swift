@@ -18,6 +18,19 @@ final class ScreenshotActions {
         }
     }
 
+    /// 截图遮罩上选好区域（可能带标注）之后执行操作。
+    func perform(_ action: CaptureAction, result: CaptureResult) {
+        perform(action, image: result.image, pointSize: result.pointSize, screenRect: result.screenRect)
+        if let message = Self.followUpMessage(annotationsDropped: result.annotationsDropped) {
+            Toast.show(message)              // 盖掉刚才的"已复制"等提示，让用户知道这张图没带上标注
+        }
+    }
+
+    /// 标注没能合成上去（极少见：位图上下文创建失败）时的补充提示。
+    static func followUpMessage(annotationsDropped: Bool) -> String? {
+        annotationsDropped ? "标注未能合成，已输出原图" : nil
+    }
+
     /// screenRect 只有贴图用得到；从贴图的右键菜单发起的操作传 nil。
     func perform(_ action: CaptureAction, image: CGImage, pointSize: CGSize, screenRect: CGRect?) {
         switch action {

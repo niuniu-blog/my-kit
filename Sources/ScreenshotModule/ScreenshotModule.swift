@@ -83,7 +83,7 @@ public final class ScreenshotModule: NSObject, AppModule {
             let controller = CaptureOverlayController(
                 snapshots: snapshots, cgWindows: windows, settings: ScreenshotSettings(defaults: defaults))
             controller.onFinish = { [weak self] action, result in
-                self?.actions.perform(action, image: result.image, pointSize: result.pointSize, screenRect: result.screenRect)
+                self?.actions.perform(action, result: result)
             }
             controller.onEnd = { [weak self] in
                 self?.session = nil
