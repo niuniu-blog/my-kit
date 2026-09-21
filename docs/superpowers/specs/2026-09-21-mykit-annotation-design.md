@@ -1,7 +1,7 @@
 # MyKit 设计文档：截图模块第二期 —— 标注工具
 
 日期：2026-09-21
-状态：设计已确认，待写实现计划
+状态：已实现（实现计划：`docs/superpowers/plans/2026-09-21-mykit-annotation.md`）
 前置：`2026-09-21-mykit-screenshot-design.md`（截图第一期，已实现；其 §8 记录了实现后的变更：快捷键 ⇧⌘A 可自定义、识别文字 / 翻译时遮罩不关闭等）
 
 ## 1. 目标与范围
@@ -126,3 +126,17 @@
 自动化（Swift Testing）：上表标 ✅ 的全部单元。重点用例：每种工具一次完整的按下-拖动-松开产生正确的标注；误点不产生标注；`Shift` 约束；起点在选区外不开始；拖出选区的终点不被夹取但渲染被裁剪；撤销 / 重做 / 新标注清空重做栈；序号在撤销后回退；`locksSelection`；`reset`；渲染像素检查；`onlyMosaic` 只应用马赛克；`SelectionModel.isLocked`；`OverlayKeyMap` 的 `⌘Z` / `⇧⌘Z`；设置读写与非法值回退。
 
 手动验收清单（实现计划最后一个任务逐条列出，面向非开发者）：九种工具逐个试、`Shift` 约束、颜色 / 粗细切换与记忆、文字工具的中文输入与换行、撤销 / 重做按钮与快捷键、取消键三级、选区锁定与解除、工具条 / 样式栏在屏幕边缘的位置、复制 / 保存 / 贴图带标注且 Retina 下清晰、识别文字不读马赛克下的内容且不受箭头等干扰、多显示器、截图结束后内存回落。
+
+## 6. 实现阶段的细化（写计划并编译验证时确定）
+
+1. `AnnotationRenderer.draw` 的实际签名为 `draw(_:in:selectionSize:baseImage:cache:)`：调用方先把上下文变换到选区内坐标（`flatten` 负责按像素倍数放大）；正在画的那一个标注由第二次、不走缓存的调用绘制。
+2. 样式栏位置：放在工具条**背向选区**的一侧（工具条在选区下方 → 样式栏在工具条下方；否则在上方），放不下则翻到另一侧。纯函数 `ToolbarPlacement.styleBarOrigin`（已测）。
+3. 正在输入文字时点击别处：只完成文字输入，这次点击不会再开始一个新标注。
+4. 正在输入文字时：工具条的「撤销」按钮 = 丢弃当前输入；`⌘Z` / `⇧⌘Z` 交给输入框；`⌘X/C/V/A` 由 `OverlayPanel` 转发给输入框。
+5. 文字输入框不自动折行（回车才换行），保证屏幕上看到的和导出的一致；超出选区的部分被裁掉。
+6. 工具顺序以 §2.1 的工具条示意为准：方框、椭圆、箭头、直线、画笔、荧光笔、文字、马赛克、序号。
+7. 新增的小单元：`AnnotationStyle`（颜色、档位、荧光笔 40% 不透明度）、`MosaicCache`（只活在一次截图会话内）、`CancelLevel` / `OverlayCancel`（取消键三级，已测）、`AnnotationStyleBar`、`ScreenshotSettings.annotation`、`ScreenshotActions.perform(_:result:)` 与 `followUpMessage`、`CaptureResult.annotationsDropped`。
+8. `OverlayView`：`cancelSelection()` 改为 `handleCancel()`；`resetSelection()` 同时清空标注和马赛克缓存；初始化参数增加定格图、像素倍数和 `AnnotationSettings`。
+9. 马赛克：矩形被切成 round(宽/方块) × round(高/方块) 个方块，正好铺满，不留半块。
+10. 箭头的线身在距箭尖约 0.9 × 箭头深度处停止，避免线头从箭尖露出来。
+11. 需要真机确认的主要风险：中文输入法的候选词窗口能否显示在全屏遮罩之上（验收清单第 8 条）。
