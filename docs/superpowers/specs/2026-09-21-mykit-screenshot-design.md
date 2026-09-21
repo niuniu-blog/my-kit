@@ -206,3 +206,9 @@
 11. 用户已取消微信和钉钉的截图快捷键，§3 的冲突实测不再需要；README 保留一句提示，供日后分享给他人时参考。
 12. 环境发现：Swift Testing 的 `#expect` 里不能直接写字面量算术（如 `x == 1600 - 16`），需先用 `let` 算好；Vision 在新进程身份下首次识别约 20–25 秒，之后约 0.3 秒。
 13. 快捷键变更：用户试用后要求把截图快捷键从 ⌃⌘A 改为 ⇧⌘A（`KeyCombo.shiftCommandA`）。实现计划文档保留原始的 ⌃⌘A 写法，以本条为准。
+14. 快捷键可自定义（用户试用后提出"应该增加快捷键功能，这样就能随时更改"）：
+    - `Core` 新增 `HotkeySettings`（UserDefaults：`hotkey.screenshot.keyCode / modifiers / keyLabel`、`hotkey.clipboard.doubleTap`；修改时发 `didChangeNotification`，object = 对应的 UserDefaults）、`DoubleTapModifier`（option / control / command，不提供 Shift —— 中文输入法用它切换中英文）、`KeyLabel`、`HotkeyValidator`（普通键必须带 ⌘/⌃/⌥ 之一，F1–F12 可单独用，⌘ + A/C/V/X/Z/Q/W/H/M/Tab/Space 保留）、`HotkeyRecorderModel` + `HotkeyRecorderView`。
+    - `ModifierEventTranslator.translate` 增加 `target:` 参数；`GlobalKeyTap` 增加 `doubleTapModifier`、`unregisterAll()`、`isSuspended`。
+    - `AppDelegate.applyHotkeys()` 按设置重新注册，监听变更通知，改完立即生效；录制新快捷键期间（`recordingDidBegin/End` 通知）暂停全局监听，否则现有快捷键会被吞掉、录不进去；录制 15 秒无输入自动取消，避免全局快捷键被一直暂停。
+    - 截图设置页的"快捷键"一行改为录制控件 +「恢复默认」；剪切板设置页新增「呼出方式」；菜单里「截图」显示的快捷键随设置更新（功能键无法用单字符表示时不显示）。
+    - 这一条同时取代了两份设计文档"第一期不做"清单里的"自定义快捷键 / 自定义热键"。

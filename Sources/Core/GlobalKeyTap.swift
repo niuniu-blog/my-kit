@@ -6,6 +6,14 @@ import os
 /// 所有回调都发生在主线程（事件源加在主 RunLoop 上）。
 public final class GlobalKeyTap {
     public var onDoubleTap: (() -> Void)?
+    /// 检测哪个修饰键的双击（默认 Option）
+    public var doubleTapModifier: DoubleTapModifier = .option {
+        didSet { detector = DoubleTapDetector() }
+    }
+    /// 为 true 时所有按键原样放行、不触发任何回调。设置页录制新快捷键期间使用。
+    public var isSuspended = false {
+        didSet { detector = DoubleTapDetector() }
+    }
 
     private var port: CFMachPort?
     private var source: CFRunLoopSource?
@@ -21,6 +29,11 @@ public final class GlobalKeyTap {
     /// 可以在 start() 之前或之后调用。
     public func register(_ combo: KeyCombo, handler: @escaping () -> Void) {
         registrations.append((combo: combo, handler: handler))
+    }
+
+    /// 清空已注册的组合键（用户改了快捷键之后重新注册前调用）。
+    public func unregisterAll() {
+        registrations.removeAll()
     }
 
     /// 返回 false 表示创建失败（通常是还没有辅助功能授权）。
@@ -79,10 +92,12 @@ public final class GlobalKeyTap {
             return false
         }
 
+        if isSuspended { return false }
+
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         let flags = event.flags
 
-        if let translated = ModifierEventTranslator.translate(type: type, keyCode: keyCode, flags: flags),
+        if let translated = ModifierEventTranslator.translate(type: type, keyCode: keyCode, flags: flags, target: doubleTapModifier),
            detector.handle(translated, at: ProcessInfo.processInfo.systemUptime) {
             onDoubleTap?()
         }

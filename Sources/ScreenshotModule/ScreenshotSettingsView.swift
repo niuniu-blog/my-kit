@@ -1,18 +1,21 @@
 import AppKit
+import Core
 import SwiftUI
 
 struct ScreenshotSettingsView: View {
     /// 空字符串 = 还没设置过 = 桌面
     @AppStorage private var folderPath: String
 
-    init(defaults: UserDefaults) {
+    private let recorder: HotkeyRecorderModel
+
+    init(defaults: UserDefaults, recorder: HotkeyRecorderModel) {
+        self.recorder = recorder
         _folderPath = AppStorage(wrappedValue: "", ScreenshotSettings.saveFolderKey, store: defaults)
     }
 
     var body: some View {
         LabeledContent("快捷键") {
-            Text("⇧⌘A")
-                .foregroundStyle(.secondary)
+            HotkeyRecorderView(model: recorder)
         }
         LabeledContent("保存位置") {
             HStack {

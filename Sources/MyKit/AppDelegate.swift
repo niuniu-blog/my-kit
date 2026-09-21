@@ -9,6 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let log = Logger(subsystem: "com.imiros.mykit", category: "app")
     private let registry = ModuleRegistry()
     private let eventTap = GlobalKeyTap()
+    private let hotkeys = HotkeySettings()
+    private var hotkeyObservers: [NSObjectProtocol] = []
     private let accessibilityWatcher = AccessibilityWatcher()
     private let onboarding = OnboardingWindowController()
     private var clipboard: ClipboardModule?
@@ -46,9 +48,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         eventTap.onDoubleTap = { [weak self] in
             self?.clipboard?.togglePanel()
         }
-        eventTap.register(.shiftCommandA) { [weak self] in
-            self?.screenshot?.startCapture()
-        }
+        applyHotkeys()
+        observeHotkeySettings()
         accessibilityWatcher.onChange = { [weak self] trusted in
             self?.accessibilityChanged(trusted)
         }
@@ -66,6 +67,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         eventTap.stop()
         accessibilityWatcher.stop()
         registry.stopAll()
+    }
+
+    /// 按当前设置（重新）注册快捷键。用户在偏好设置里改完立即调用，无需重启。
+    private func applyHotkeys() {
+        eventTap.unregisterAll()
+        eventTap.doubleTapModifier = hotkeys.clipboardDoubleTap
+        eventTap.register(hotkeys.screenshotCombo) { [weak self] in
+            self?.screenshot?.startCapture()
+        }
+    }
+
+    private func observeHotkeySettings() {
+        let center = NotificationCenter.default
+        hotkeyObservers = [
+            center.addObserver(forName: HotkeySettings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.applyHotkeys() }
+            },
+            // 设置页录制新快捷键期间暂停全局监听，否则现有快捷键会被吞掉、录不进去
+            center.addObserver(forName: HotkeySettings.recordingDidBeginNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.eventTap.isSuspended = true }
+            },
+            center.addObserver(forName: HotkeySettings.recordingDidEndNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.eventTap.isSuspended = false }
+            },
+        ]
     }
 
     /// 授权状态变化（含启动时的首次检查）：有权限就开始监听双击 Option，没有就弹引导。

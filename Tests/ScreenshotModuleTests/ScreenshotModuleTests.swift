@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Testing
+import Core
 @testable import ScreenshotModule
 
 @MainActor
@@ -27,6 +28,23 @@ import Testing
         #expect(items[0].keyEquivalent == "a")
         #expect(items[0].keyEquivalentModifierMask == [.shift, .command])
         #expect(items.allSatisfy { $0.target != nil && $0.action != nil })
+    }
+
+    @Test func menuShortcutFollowsHotkeySettings() {
+        let suite = "mykit-test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let module = ScreenshotModule(defaults: defaults)
+        let item = module.menuItems[0]
+
+        HotkeySettings(defaults: defaults).setScreenshot(
+            combo: KeyCombo(keyCode: 1, modifiers: [.maskControl, .maskAlternate]), keyLabel: "S")
+        #expect(item.keyEquivalent == "s")
+        #expect(item.keyEquivalentModifierMask == [.control, .option])
+
+        // 功能键在菜单里没法用单个字符表示：不显示快捷键，但不影响实际触发
+        HotkeySettings(defaults: defaults).setScreenshot(combo: KeyCombo(keyCode: 122, modifiers: []), keyLabel: "F1")
+        #expect(item.keyEquivalent == "")
     }
 
     @Test func startAndStopDoNotRequirePermissions() throws {

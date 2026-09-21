@@ -9,7 +9,9 @@ public final class ScreenshotModule: NSObject, AppModule {
     public let name = "截图"
 
     private let defaults: UserDefaults
+    private let hotkeys: HotkeySettings
     private let actions: ScreenshotActions
+    private var hotkeyObserver: NSObjectProtocol?
     private let guide = ScreenRecordingGuideWindowController()
     private let log = Logger(subsystem: "com.imiros.mykit", category: "screenshot")
     /// 正在进行的截图会话。同一时间只允许一个。
@@ -19,8 +21,23 @@ public final class ScreenshotModule: NSObject, AppModule {
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        self.hotkeys = HotkeySettings(defaults: defaults)
         self.actions = ScreenshotActions(settings: ScreenshotSettings(defaults: defaults))
         super.init()
+        // 用户在设置里改了快捷键 → 菜单上显示的快捷键跟着变
+        hotkeyObserver = NotificationCenter.default.addObserver(
+            forName: HotkeySettings.didChangeNotification, object: defaults, queue: nil
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.applyShortcutToMenuItem()
+            }
+        }
+    }
+
+    deinit {
+        if let hotkeyObserver {
+            NotificationCenter.default.removeObserver(hotkeyObserver)
+        }
     }
 
     public func start() throws {}
@@ -84,11 +101,33 @@ public final class ScreenshotModule: NSObject, AppModule {
     // MARK: 菜单与设置
 
     private lazy var captureMenuItem: NSMenuItem = {
-        let item = NSMenuItem(title: "截图", action: #selector(captureFromMenu), keyEquivalent: "a")
-        item.keyEquivalentModifierMask = [.shift, .command]       // 在菜单里显示 ⇧⌘A
+        let item = NSMenuItem(title: "截图", action: #selector(captureFromMenu), keyEquivalent: "")
         item.target = self
+        Self.applyShortcut(hotkeys.screenshotCombo, keyLabel: hotkeys.screenshotKeyLabel, to: item)
         return item
     }()
+
+    /// 截图快捷键的录制状态（设置页用）
+    private lazy var recorderModel = HotkeyRecorderModel(
+        current: { [hotkeys] in (combo: hotkeys.screenshotCombo, keyLabel: hotkeys.screenshotKeyLabel) },
+        save: { [hotkeys] combo, keyLabel in hotkeys.setScreenshot(combo: combo, keyLabel: keyLabel) },
+        resetToDefault: { [hotkeys] in hotkeys.resetScreenshot() }
+    )
+
+    private func applyShortcutToMenuItem() {
+        Self.applyShortcut(hotkeys.screenshotCombo, keyLabel: hotkeys.screenshotKeyLabel, to: captureMenuItem)
+    }
+
+    /// 菜单项只能用单个字母 / 数字显示快捷键；F1 之类的功能键就不显示（不影响实际触发）。
+    private static func applyShortcut(_ combo: KeyCombo, keyLabel: String, to item: NSMenuItem) {
+        if keyLabel.count == 1, let scalar = keyLabel.unicodeScalars.first, CharacterSet.alphanumerics.contains(scalar) {
+            item.keyEquivalent = keyLabel.lowercased()
+            item.keyEquivalentModifierMask = combo.appKitModifiers
+        } else {
+            item.keyEquivalent = ""
+            item.keyEquivalentModifierMask = []
+        }
+    }
 
     private lazy var closePinsMenuItem: NSMenuItem = {
         let item = NSMenuItem(title: "关闭所有贴图", action: #selector(closeAllPinsFromMenu), keyEquivalent: "")
@@ -101,7 +140,7 @@ public final class ScreenshotModule: NSObject, AppModule {
     }
 
     public var settingsView: AnyView? {
-        AnyView(ScreenshotSettingsView(defaults: defaults))
+        AnyView(ScreenshotSettingsView(defaults: defaults, recorder: recorderModel))
     }
 
     @objc private func captureFromMenu() {
