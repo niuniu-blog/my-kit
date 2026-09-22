@@ -12,7 +12,7 @@ final class CaptureToolbar: NSVisualEffectView {
         ("识别文字", "text.viewfinder", "识别图中文字  ⌘R", .perform(.recognize)),
         ("保存", "square.and.arrow.down", "保存为 PNG 文件  ⌘S", .perform(.save)),
         ("复制", "doc.on.doc", "复制到剪切板  ↩", .perform(.copy)),
-        ("", "xmark", "取消  Esc", .cancel),
+        ("", "xmark", "退出截图  Esc", .exit),
     ]
     private var toolButtons: [NSButton] = []
     private var undoButton = NSButton()

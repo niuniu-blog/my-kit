@@ -3,9 +3,10 @@ import Testing
 @testable import ScreenshotModule
 
 @Suite struct OverlayKeyMapTests {
-    @Test func escapeCancelsRegardlessOfModifiers() {
-        #expect(OverlayKeyMap.command(keyCode: 53, characters: "\u{1b}", modifiers: []) == .cancel)
-        #expect(OverlayKeyMap.command(keyCode: 53, characters: "\u{1b}", modifiers: [.shift]) == .cancel)
+    @Test func escapeExitsRegardlessOfModifiers() {
+        // 按一下 Esc 就退出截图（不是逐级取消；逐级取消是右键 / 工具条 ✕ 的事）
+        #expect(OverlayKeyMap.command(keyCode: 53, characters: "\u{1b}", modifiers: []) == .exit)
+        #expect(OverlayKeyMap.command(keyCode: 53, characters: "\u{1b}", modifiers: [.shift]) == .exit)
     }
 
     @Test func returnAndKeypadEnterCopy() {

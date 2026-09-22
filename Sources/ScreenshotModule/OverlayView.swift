@@ -82,7 +82,18 @@ final class OverlayView: NSView {
     /// 已完成的标注（选区内坐标），导出时合成到图上。
     var annotations: [Annotation] { annotation.items }
 
-    /// Esc / 右键。按层级处理一级；返回 true 表示这块屏上已经没有任何东西可取消（控制器据此决定是否退出截图）。
+    /// Esc。返回 true 表示应该退出截图；返回 false 表示这一下只是完成了正在输入的文字。
+    func handleEscape() -> Bool {
+        switch OverlayCancel.escapeLevel(isEditingText: textEditor != nil) {
+        case .finishText:
+            commitPendingText()
+            return false
+        default:
+            return true
+        }
+    }
+
+    /// 右键（逐级取消）。处理一级；返回 true 表示这块屏上已经没有任何东西可取消（控制器据此决定是否退出截图）。
     func handleCancel() -> Bool {
         let level = OverlayCancel.level(
             isEditingText: textEditor != nil,
@@ -401,7 +412,7 @@ final class OverlayView: NSView {
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        delegate?.overlayView(self, didRequest: .cancel)
+        delegate?.overlayView(self, didRequest: .stepBack)       // 右键：逐级取消（清选区重选时用）
     }
 
     private func updateCursor(at point: CGPoint) {

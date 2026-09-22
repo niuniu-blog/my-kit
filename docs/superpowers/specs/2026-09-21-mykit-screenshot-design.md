@@ -233,3 +233,4 @@
     - 翻译失败且语言包仍未安装时，`OCRResultModel.reportLanguagePackMissing()` 把提示换成具体办法：在系统提示里点「下载」，或手动到 系统设置 → 通用 → 语言与地区 → 翻译语言 下载「英语」和「简体中文」（已测）。
     - 仍需真机确认：下载提示在降级后的遮罩上是否可见、下载完成后是否需要重新勾选一次。
 18. 贴图支持触控板双指捏合缩放（用户试用后提出）：`PinZoom.scale(current:magnification:)`（相对当前大小、夹在 10%…500%、异常负值不会让图片翻转，已测），`PinWindow` 的内容视图响应 `magnify(with:)`；原有的滚轮 / 双指滑动缩放保留。
+19. `Esc` 改为一下就退出截图（用户反馈"现在要按两次"）：`OverlayCommand` 拆成 `.exit`（Esc、工具条 ✕）与 `.stepBack`（右键）。`OverlayCancel.escapeLevel(isEditingText:)`：正在往标注里打字 → 只完成输入（不然刚打的字连同整张截图一起丢掉），否则 → 退出（已测）。右键保留原来的逐级取消（`OverlayCancel.level`），用于想重新框选但不想退出的情况。§2.3 的"取消"一行和标注设计文档 §2.4 的三级层级以本条为准。

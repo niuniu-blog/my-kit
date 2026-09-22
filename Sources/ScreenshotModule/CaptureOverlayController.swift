@@ -192,8 +192,13 @@ final class CaptureOverlayController: OverlayViewDelegate {
 
     private func handle(_ command: OverlayCommand) {
         switch command {
-        case .cancel:
-            // 每块屏按层级处理一级（完成文字 → 取消工具 → 清选区和标注）；哪块屏都没东西可取消 → 退出截图
+        case .exit:
+            // Esc / ✕：按一下就退出。正在打字的那块屏先完成输入，这一下就到此为止
+            let finishedText = entries.contains { !$0.view.handleEscape() }
+            if !finishedText { end() }
+
+        case .stepBack:
+            // 右键：每块屏按层级退一级（完成文字 → 取消工具 → 清选区和标注）；哪块屏都没东西可取消 → 退出截图
             var cancelledSomething = false
             for entry in entries where !entry.view.handleCancel() {
                 cancelledSomething = true

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Esc / 右键要做的事，按优先级从高到低。
+/// 右键（逐级取消）要做的事，按优先级从高到低。
 enum CancelLevel: Equatable {
     /// 正在输入文字 → 完成文字输入
     case finishText
@@ -12,8 +12,15 @@ enum CancelLevel: Equatable {
     case exitCapture
 }
 
-/// 取消键的层级。纯函数。
+/// 取消的规则。纯函数。
 enum OverlayCancel {
+    /// Esc：按一下就退出截图。唯一的例外是正在往标注里打字 —— 这时 Esc 只完成输入，
+    /// 否则刚打的字会连同整张截图一起丢掉。
+    static func escapeLevel(isEditingText: Bool) -> CancelLevel {
+        isEditingText ? .finishText : .exitCapture
+    }
+
+    /// 右键 / 工具条 ✕：每按一次退一级。
     static func level(isEditingText: Bool, hasTool: Bool, hasSelection: Bool) -> CancelLevel {
         if isEditingText { return .finishText }
         if hasTool { return .deselectTool }
