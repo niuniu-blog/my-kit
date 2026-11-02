@@ -22,15 +22,23 @@ struct LauncherView: View {
             presetBar
             ipField
             Divider()
-            folderRows
-            LayoutPreview(rows: PaneLayout.rows(count: model.current.folders.count))
-            Button {
-                model.addRow()
-            } label: {
-                Label("加一个终端", systemImage: "plus")
+            // 中间这块可以滚动：窗口拉小时上面的组合/IP 和下面的按钮始终看得见
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    folderRows
+                    LayoutPreview(rows: PaneLayout.rows(count: model.current.folders.count))
+                    Button {
+                        model.addRow()
+                    } label: {
+                        Label("加一个终端", systemImage: "plus")
+                    }
+                    .disabled(!model.canAddRow)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 2)
             }
-            .disabled(!model.canAddRow)
-            Spacer(minLength: 0)
+            .frame(minHeight: 140, maxHeight: .infinity)
+            Divider()
             HStack {
                 Spacer()
                 Button("取消", action: onCancel)
@@ -41,8 +49,7 @@ struct LauncherView: View {
             }
         }
         .padding(20)
-        .frame(width: 520)
-        .frame(minHeight: 300)
+        .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
         .alert(nameEdit == .create ? "新建组合" : "改名", isPresented: Binding(
             get: { nameEdit != nil },
             set: { if !$0 { nameEdit = nil } }

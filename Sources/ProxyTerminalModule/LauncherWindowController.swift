@@ -30,17 +30,19 @@ final class LauncherWindowController: NSObject, NSWindowDelegate {
                 }
             )
             let window = EditableWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 520, height: 320),
-                styleMask: [.titled, .closable],
+                contentRect: NSRect(x: 0, y: 0, width: 680, height: 620),
+                styleMask: [.titled, .closable, .resizable],
                 backing: .buffered,
                 defer: false
             )
             window.title = "打开代理终端"
             window.isReleasedWhenClosed = false
             let hosting = NSHostingView(rootView: view)
-            hosting.sizingOptions = [.preferredContentSize]
+            hosting.sizingOptions = [.minSize]   // 能拖动改大小，但不能小到挤坏内容
             window.contentView = hosting
             window.center()
+            // 记住上次拖成的大小和位置，下次打开还是那样
+            window.setFrameAutosaveName("ProxyTerminalLauncher")
             window.delegate = self
             self.window = window
             self.model = model
