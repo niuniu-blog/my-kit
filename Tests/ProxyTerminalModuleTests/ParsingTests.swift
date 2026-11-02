@@ -122,8 +122,11 @@ import Testing
     }
 
     @Test func parsesContentsRecords() {
-        let output = "A\u{1F}line1\nline2\u{1E}B\u{1F}\u{1E}"
-        #expect(ITermScripts.parseContents(output) == ["A": "line1\nline2", "B": ""])
+        let output = "A\u{1F}my (claude)\u{1F}line1\nline2\u{1E}B\u{1F}\u{1F}\u{1E}"
+        #expect(ITermScripts.parseContents(output) == [
+            "A": PaneSnapshot(name: "my (claude)", text: "line1\nline2"),
+            "B": PaneSnapshot(name: "", text: ""),
+        ])
     }
 
     @Test func applyScriptOnlyTintsFailedPanes() {

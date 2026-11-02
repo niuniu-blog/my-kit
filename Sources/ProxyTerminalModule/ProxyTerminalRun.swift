@@ -22,7 +22,9 @@ public struct LaunchClaude: ProxyPassAction {
     public func command(verifiedAddress: String) -> String? {
         let expected = PaneCommands.shellQuoted(verifiedAddress)
         let seconds = (1...Self.countdownSeconds).reversed().map(String.init).joined(separator: " ")
-        return "for i in \(seconds); do printf '\\r✅ IP 核对通过，%s 秒后启动 claude（按 Ctrl+C 取消）' $i; sleep 1; done; echo; "
+        // 倒计时不用 \r 原地刷新：分屏窄时一行放不下会折行，\r 只回到折行的开头，屏幕上会留下一堆半截的行
+        return "echo '✅ IP 核对通过，\(Self.countdownSeconds) 秒后启动 claude（按 Ctrl+C 取消）'; "
+            + "for i in \(seconds); do printf '%s… ' $i; sleep 1; done; echo; "
             + "if [ \"$(curl -s --max-time 10 ip.sb)\" = \(expected) ]; then CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 claude; "
             + "else echo '❌ 出口 IP 和核对时不一致，已阻止启动 claude'; fi"
     }
@@ -39,7 +41,8 @@ public enum PaneState: Equatable {
     var isFinished: Bool { self != .waiting }
 }
 
-/// 一次「打开代理终端」：开窗口，然后轮询每块的结果直到全部出结果。
+/// 一次「打开代理终端」：开窗口，轮询每块的结果直到全部出结果；
+/// 之后对核对通过的块再守 40 秒标题 —— Claude Code 启动后 iTerm2 的「工作组」会把标题改成「聊天」，改回文件夹名。
 @MainActor
 public final class ProxyTerminalRun {
     public struct Pane: Equatable {
@@ -47,19 +50,25 @@ public final class ProxyTerminalRun {
         public let title: String
         public let sessionID: String
         public var state: PaneState
+        /// 核对通过的时间（守标题用）
+        public var passedAt: Date?
     }
 
     public static let timeout: TimeInterval = 15
+    /// 核对通过后守标题多久：倒计时 5 秒 + 再查一次 IP 最多 10 秒 + Claude Code 启动，留足余量
+    public static let titleGuard: TimeInterval = 40
 
     public private(set) var panes: [Pane] = []
     public private(set) var windowID = 0
-    public private(set) var isFinished = false
+    /// 全部结束（不用再轮询了）
+    public private(set) var isDone = false
 
     private let preset: TerminalPreset
     private let driver: TerminalDriving
     private let passAction: ProxyPassAction
     private let commands: PaneCommands
     private var startedAt = Date()
+    private var summaryTaken = false
 
     public init(preset: TerminalPreset, driver: TerminalDriving, passAction: ProxyPassAction,
                 commands: PaneCommands = PaneCommands()) {
@@ -83,54 +92,75 @@ public final class ProxyTerminalRun {
         driver.showToolbelt()
     }
 
-    /// 读一遍各块的结果。返回 true 表示全部出结果了（之后不用再调）。
-    @discardableResult
-    public func poll(at now: Date = Date()) -> Bool {
-        guard !isFinished else { return true }
-        let contents: [String: String]
+    /// 每块都出结果了
+    public var resultsReady: Bool {
+        panes.allSatisfy { $0.state.isFinished }
+    }
+
+    /// 全部出结果后返回一次汇总提示，之后返回 nil
+    public func takeSummary() -> String? {
+        guard resultsReady, !summaryTaken else { return nil }
+        summaryTaken = true
+        return summary
+    }
+
+    /// 读一遍各块：还在等的看结果，刚通过的输入下一步的命令，守标题期内的通过块被改了标题就改回来。
+    public func poll(at now: Date = Date()) {
+        guard !isDone else { return }
+        let snapshots: [String: PaneSnapshot]
         do {
-            contents = try driver.contents(windowID: windowID)
+            snapshots = try driver.contents(windowID: windowID)
         } catch {
             // 读不到（窗口被关掉等）：还没出结果的都算关掉了
             for index in panes.indices where !panes[index].state.isFinished {
                 panes[index].state = .closed
             }
-            return finish()
+            isDone = true
+            return
         }
 
         let timedOut = now.timeIntervalSince(startedAt) >= Self.timeout
         var updates: [PaneUpdate] = []
-        for index in panes.indices where !panes[index].state.isFinished {
+        for index in panes.indices where needsWatching(panes[index], now: now) {
             let pane = panes[index]
-            guard let text = contents[pane.sessionID] else {
-                panes[index].state = .closed
+            guard let snapshot = snapshots[pane.sessionID] else {
+                if !pane.state.isFinished { panes[index].state = .closed }
                 continue
             }
-            switch PaneOutputParser.parse(text, commands: commands) {
-            case .address(let address):
-                panes[index].state = IPAddress.same(address, preset.expectedIP) ? .passed(address) : .wrongAddress(address)
-            case .noAddress:
-                panes[index].state = .noAddress
-            case .pending:
-                if timedOut { panes[index].state = .timedOut }
+            if pane.state == .waiting {
+                switch PaneOutputParser.parse(snapshot.text, commands: commands) {
+                case .address(let address):
+                    panes[index].state = IPAddress.same(address, preset.expectedIP) ? .passed(address) : .wrongAddress(address)
+                case .noAddress:
+                    panes[index].state = .noAddress
+                case .pending:
+                    if timedOut { panes[index].state = .timedOut }
+                }
             }
-            // 还在等的也重设一次标题：shell 刚启动时会把标题改成路径
             let state = panes[index].state
-            // 只有核对通过（.passed 只在 IP 与预期一致时才会出现）的块才输入下一步的命令；其余一律不输入
+            let justFinished = pane.state == .waiting && state.isFinished
+            // 只有这一次刚核对通过（.passed 只在 IP 与预期一致时才会出现）的块才输入下一步的命令；其余一律不输入
             var typeText: String?
-            if case .passed(let address) = state {
+            if justFinished, case .passed(let address) = state {
                 typeText = passAction.command(verifiedAddress: address)
+                panes[index].passedAt = now
             }
-            updates.append(PaneUpdate(sessionID: pane.sessionID, title: Self.title(pane.title, state),
-                                      markFailed: state.isFinished && !Self.isPassed(state), typeText: typeText))
+            let title = Self.title(pane.title, state)
+            // 标题被别人改了（oh-my-zsh 改成命令名、iTerm2 工作组改成「聊天」）或者状态刚变，才去改
+            if justFinished || !snapshot.name.hasPrefix(title) {
+                updates.append(PaneUpdate(sessionID: pane.sessionID, title: title,
+                                          markFailed: justFinished && !Self.isPassed(state), typeText: typeText))
+            }
         }
         try? driver.apply(updates, windowID: windowID)
-        return panes.allSatisfy { $0.state.isFinished } ? finish() : false
+        isDone = panes.allSatisfy { !needsWatching($0, now: now) }
     }
 
-    private func finish() -> Bool {
-        isFinished = true
-        return true
+    /// 还在等结果，或者核对通过还在守标题期内
+    private func needsWatching(_ pane: Pane, now: Date) -> Bool {
+        if pane.state == .waiting { return true }
+        guard let passedAt = pane.passedAt else { return false }
+        return now.timeIntervalSince(passedAt) < Self.titleGuard
     }
 
     /// 全部出结果后弹的提示

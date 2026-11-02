@@ -3,7 +3,7 @@ import Core
 
 /// 代理终端：右上角菜单里的「打开代理终端…」。让 iTerm2 开一个分屏窗口，每块进入各自的文件夹、
 /// 执行 proxy 和 curl ip.sb，再和预期 IP 比对；
-/// 一致的块启动 Claude Code，不一致的标红、什么都不执行。平时零开销，只在检查期间每 0.5 秒读一次屏幕。
+/// 一致的块启动 Claude Code，不一致的标红、什么都不执行。平时零开销，只在检查和守标题期间（最多约 1 分钟）每 0.5 秒读一次屏幕。
 @MainActor
 public final class ProxyTerminalModule: NSObject, AppModule {
     public let id = "proxyTerminal"
@@ -14,7 +14,7 @@ public final class ProxyTerminalModule: NSObject, AppModule {
     private let makeDriver: () -> TerminalDriving
     private let passAction: ProxyPassAction
     private var launcher: LauncherWindowController!
-    /// 正在检查中的几次（可以同时开好几个窗口）
+    /// 正在检查 / 守标题的几次（可以同时开好几个窗口）
     private var runs: [ObjectIdentifier: (run: ProxyTerminalRun, timer: Timer)] = [:]
 
     /// makeDriver / makeStore 只在测试里替换。
@@ -79,10 +79,15 @@ public final class ProxyTerminalModule: NSObject, AppModule {
     }
 
     private func poll(_ key: ObjectIdentifier) {
-        guard let entry = runs[key], entry.run.poll() else { return }
-        entry.timer.invalidate()
-        runs[key] = nil
-        Toast.show(entry.run.summary, duration: 4)
+        guard let entry = runs[key] else { return }
+        entry.run.poll()
+        if let summary = entry.run.takeSummary() {
+            Toast.show(summary, duration: 4)
+        }
+        if entry.run.isDone {
+            entry.timer.invalidate()
+            runs[key] = nil
+        }
     }
 
     private func showAutomationDenied() {

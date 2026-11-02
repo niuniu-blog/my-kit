@@ -2,10 +2,12 @@ import Foundation
 import Testing
 @testable import ProxyTerminalModule
 
+/// 假的 iTerm2：标题被 apply 改过就记住（像真的一样），也可以模拟别人改标题
 @MainActor
 final class FakeDriver: TerminalDriving {
     var opened: [PaneSpec] = []
     var screens: [String: String] = [:]
+    var names: [String: String] = [:]
     var applied: [[PaneUpdate]] = []
     var openError: TerminalError?
     var windowGone = false
@@ -16,13 +18,16 @@ final class FakeDriver: TerminalDriving {
         return OpenedWindow(windowID: 9, sessionIDs: panes.indices.map { "S\($0)" })
     }
 
-    func contents(windowID: Int) throws -> [String: String] {
+    func contents(windowID: Int) throws -> [String: PaneSnapshot] {
         if windowGone { throw TerminalError.windowClosed }
-        return screens
+        return Dictionary(uniqueKeysWithValues: screens.map { ($0.key, PaneSnapshot(name: names[$0.key] ?? "", text: $0.value)) })
     }
 
     func apply(_ updates: [PaneUpdate], windowID: Int) throws {
         applied.append(updates)
+        for update in updates {
+            names[update.sessionID] = update.title
+        }
     }
 
     var toolbeltRequests = 0
@@ -46,6 +51,10 @@ final class RecordingPassAction: ProxyPassAction {
 
     func finished(_ result: String) -> String {
         "\(commands.checkIP)\n\(result)\n\n\(commands.marker)\n"
+    }
+
+    func at(_ seconds: TimeInterval) -> Date {
+        start.addingTimeInterval(seconds)
     }
 
     func makeRun(folders: [String], driver: FakeDriver, action: RecordingPassAction? = nil,
@@ -72,7 +81,7 @@ final class RecordingPassAction: ProxyPassAction {
         let run = try makeRun(folders: ["/w/api", "/w/web", "/w/db"], driver: driver, action: action)
 
         driver.screens = ["S0": finished("1.2.3.4"), "S1": finished("5.6.7.8"), "S2": commands.checkIP]
-        #expect(run.poll(at: start.addingTimeInterval(2)) == false)
+        run.poll(at: at(2))
         #expect(run.panes.map(\.state) == [.passed("1.2.3.4"), .wrongAddress("5.6.7.8"), .waiting])
         #expect(action.asked == ["1.2.3.4"])
         #expect(driver.applied.last == [
@@ -80,13 +89,49 @@ final class RecordingPassAction: ProxyPassAction {
             PaneUpdate(sessionID: "S1", title: "web ❌ 5.6.7.8", markFailed: true),
             PaneUpdate(sessionID: "S2", title: "db", markFailed: false),
         ])
+        #expect(run.takeSummary() == nil)
 
-        // 已出结果的块不再更新，也不会重复执行下一步
-        #expect(run.poll(at: start.addingTimeInterval(16)) == true)
+        // 已出结果的块不再重复执行下一步、不再重复染红；标题没被改就不去动它
+        run.poll(at: at(16))
         #expect(run.panes[2].state == .timedOut)
         #expect(driver.applied.last == [PaneUpdate(sessionID: "S2", title: "db ❌ 超时", markFailed: true)])
         #expect(action.asked == ["1.2.3.4"])
-        #expect(run.summary == "3 个终端：1 个 IP 正确，web 不对（实际 5.6.7.8）、db 超时")
+        #expect(run.takeSummary() == "3 个终端：1 个 IP 正确，web 不对（实际 5.6.7.8）、db 超时")
+        #expect(run.takeSummary() == nil)   // 只提示一次
+    }
+
+    /// Claude Code 启动后 iTerm2 工作组把标题改成「聊天」：守标题期内改回文件夹名，但绝不再输入命令
+    @Test func passedPaneTitleIsRestoredDuringGuard() throws {
+        let driver = FakeDriver()
+        let action = RecordingPassAction()
+        let run = try makeRun(folders: ["/w/api", "/w/web"], driver: driver, action: action)
+        driver.screens = ["S0": finished("1.2.3.4"), "S1": finished("5.6.7.8")]
+        run.poll(at: at(2))
+        #expect(!run.isDone)
+
+        driver.names["S0"] = "api ✅ 1.2.3.4 (claude)"          // 带后缀不算被改
+        run.poll(at: at(5))
+        #expect(driver.applied.last == [])
+
+        driver.names["S0"] = "聊天 (claude)"
+        driver.names["S1"] = "聊天 (zsh)"                        // 失败的块不守
+        run.poll(at: at(10))
+        #expect(driver.applied.last == [PaneUpdate(sessionID: "S0", title: "api ✅ 1.2.3.4", markFailed: false)])
+        #expect(action.asked == ["1.2.3.4"])
+
+        run.poll(at: at(41))
+        #expect(!run.isDone)
+        run.poll(at: at(42))
+        #expect(run.isDone)
+    }
+
+    @Test func doneRightAwayWhenNothingPassed() throws {
+        let driver = FakeDriver()
+        let run = try makeRun(folders: ["/a"], driver: driver)
+        driver.screens = ["S0": finished("5.6.7.8")]
+        run.poll(at: start)
+        #expect(run.isDone)
+        #expect(run.takeSummary() == "1 个终端：0 个 IP 正确，a 不对（实际 5.6.7.8）")
     }
 
     /// 核对失败的任何情况都绝不能输入下一步的命令
@@ -101,7 +146,8 @@ final class RecordingPassAction: ProxyPassAction {
             "S3": commands.checkIP,                              // 一直没执行完
             // S4 那块被关掉了
         ]
-        #expect(run.poll(at: start.addingTimeInterval(20)) == true)
+        run.poll(at: at(20))
+        #expect(run.isDone)
         #expect(run.panes.map(\.state) == [.wrongAddress("1.2.3.40"), .wrongAddress("2001:db8::1"), .noAddress, .timedOut, .closed])
         #expect(action.asked.isEmpty)
         #expect(driver.applied.flatMap { $0 }.allSatisfy { $0.typeText == nil })
@@ -110,14 +156,15 @@ final class RecordingPassAction: ProxyPassAction {
         let driver2 = FakeDriver()
         let run2 = try makeRun(folders: ["/a"], driver: driver2, action: action, expectedIP: "")
         driver2.screens = ["S0": finished("1.2.3.4")]
-        #expect(run2.poll(at: start) == true)
+        run2.poll(at: start)
         #expect(run2.panes[0].state == .wrongAddress("1.2.3.4"))
         #expect(action.asked.isEmpty)
     }
 
     @Test func launchClaudeCountsDownThenRechecksAddressInShell() {
         let command = LaunchClaude().command(verifiedAddress: "1.2.3.4")
-        #expect(command == #"for i in 5 4 3 2 1; do printf '\r✅ IP 核对通过，%s 秒后启动 claude（按 Ctrl+C 取消）' $i; sleep 1; done; echo; "#
+        #expect(command == "echo '✅ IP 核对通过，5 秒后启动 claude（按 Ctrl+C 取消）'; "
+            + "for i in 5 4 3 2 1; do printf '%s… ' $i; sleep 1; done; echo; "
             + #"if [ "$(curl -s --max-time 10 ip.sb)" = '1.2.3.4' ]; then CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 claude; "#
             + "else echo '❌ 出口 IP 和核对时不一致，已阻止启动 claude'; fi")
         #expect(NoPassAction().command(verifiedAddress: "1.2.3.4") == nil)
@@ -127,31 +174,33 @@ final class RecordingPassAction: ProxyPassAction {
         let driver = FakeDriver()
         let run = try makeRun(folders: ["/a", "/b"], driver: driver)
         driver.screens = ["S0": finished("1.2.3.4"), "S1": finished("1.2.3.4")]
-        #expect(run.poll(at: start) == true)
-        #expect(run.summary == "2 个终端 IP 全部正确")
+        run.poll(at: start)
+        #expect(run.takeSummary() == "2 个终端 IP 全部正确")
     }
 
     @Test func curlWithoutOutputCountsAsNoAddress() throws {
         let driver = FakeDriver()
         let run = try makeRun(folders: ["/a"], driver: driver)
         driver.screens = ["S0": finished("")]
-        #expect(run.poll(at: start) == true)
+        run.poll(at: start)
         #expect(run.panes[0].state == .noAddress)
-        #expect(run.summary == "1 个终端：0 个 IP 正确，a 没拿到 IP")
+        #expect(run.takeSummary() == "1 个终端：0 个 IP 正确，a 没拿到 IP")
     }
 
     @Test func closedWindowFinishesRun() throws {
         let driver = FakeDriver()
         let run = try makeRun(folders: ["/a", "/b"], driver: driver)
         driver.screens = ["S0": finished("1.2.3.4")]   // S1 那块被关掉了
-        #expect(run.poll(at: start) == true)
+        run.poll(at: start)
         #expect(run.panes[1].state == .closed)
+        #expect(run.resultsReady)
 
         let driver2 = FakeDriver()
         let run2 = try makeRun(folders: ["/a"], driver: driver2)
         driver2.windowGone = true
-        #expect(run2.poll(at: start) == true)
-        #expect(run2.summary == "1 个终端：0 个 IP 正确，a 已关闭")
+        run2.poll(at: start)
+        #expect(run2.isDone)
+        #expect(run2.takeSummary() == "1 个终端：0 个 IP 正确，a 已关闭")
     }
 
     @Test func startPropagatesDriverErrors() {
