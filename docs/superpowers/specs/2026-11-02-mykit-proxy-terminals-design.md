@@ -17,7 +17,7 @@
 | 组合 | 可以存好几套（如「工作」「个人」），每套有名字、自己的文件夹列表和预期 IP |
 | 标题 | 每块的标题显示所在文件夹的名字 |
 | IP 不对时 | 那一块标红并停下，MyKit 提示哪几块不对；其余对的照常继续 |
-| 下一步 | （2026-11-02 定）核对通过的块自动启动 Claude Code；核对失败（IP 不对 / 没拿到 / 超时 / 被关掉）的块**绝不执行**。启动前在 shell 里再查一次出口 IP，与核对结果不一致也不启动 |
+| 下一步 | （2026-11-02 定）核对通过的块倒计时 5 秒（可按 Ctrl+C 取消）后自动启动 Claude Code；核对失败（IP 不对 / 没拿到 / 超时 / 被关掉）的块**绝不执行**。启动前在 shell 里再查一次出口 IP，与核对结果不一致也不启动 |
 
 ### 本机情况（2026-11-02 查过）
 
@@ -63,7 +63,7 @@
 2. 每块的标题是文件夹名（如 `api`）；同名的加序号区分（`api`、`api (2)`）。
 3. 每块依次输入两行：`export DISABLE_AUTO_TITLE=true; printf '\033]0;%s\007' '文件夹名'; cd -- '文件夹'`（关掉 oh-my-zsh 自动改标题、先把标题设成文件夹名，再进文件夹），然后 `proxy; curl -s --max-time 10 ip.sb; echo; echo "MYKIT-END-$((a+b))"`。
 4. MyKit 在后台读每块的屏幕内容，找出 curl 打印的 IP，与这套组合的预期 IP 比对：
-   - 一致：标题改为 `api ✅ 1.2.3.4`，并输入 `if [ "$(curl -s --max-time 10 ip.sb)" = '1.2.3.4' ]; then CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 claude; else echo '❌ 出口 IP 和核对时不一致，已阻止启动 claude'; fi`（再核对一次才启动；关掉 Claude Code 改终端标题，标题保持文件夹名）。
+   - 一致：标题改为 `api ✅ 1.2.3.4`，并输入 `for i in 5 4 3 2 1; do printf '\r✅ IP 核对通过，%s 秒后启动 claude（按 Ctrl+C 取消）' $i; sleep 1; done; echo; if [ "$(curl -s --max-time 10 ip.sb)" = '1.2.3.4' ]; then CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 claude; else echo '❌ 出口 IP 和核对时不一致，已阻止启动 claude'; fi`（倒计时 5 秒，Ctrl+C 整行取消；倒计时结束再核对一次才启动；关掉 Claude Code 改终端标题，标题保持文件夹名）。
    - 不一致 / 15 秒内没拿到 IP（代理没开、网络不通等）：该块背景染成淡红色、标题改为 `api ❌ 5.6.7.8` 或 `api ❌ 超时`，不再往下走。
 5. 全部出结果后，MyKit 弹一条提示（沿用现有 Toast）：`3 个终端：2 个 IP 正确，web 不对（实际 5.6.7.8）`。
 

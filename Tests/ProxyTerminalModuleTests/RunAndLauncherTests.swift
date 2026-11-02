@@ -109,9 +109,10 @@ final class RecordingPassAction: ProxyPassAction {
         #expect(action.asked.isEmpty)
     }
 
-    @Test func launchClaudeRechecksAddressInShell() {
+    @Test func launchClaudeCountsDownThenRechecksAddressInShell() {
         let command = LaunchClaude().command(verifiedAddress: "1.2.3.4")
-        #expect(command == #"if [ "$(curl -s --max-time 10 ip.sb)" = '1.2.3.4' ]; then CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 claude; "#
+        #expect(command == #"for i in 5 4 3 2 1; do printf '\r✅ IP 核对通过，%s 秒后启动 claude（按 Ctrl+C 取消）' $i; sleep 1; done; echo; "#
+            + #"if [ "$(curl -s --max-time 10 ip.sb)" = '1.2.3.4' ]; then CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 claude; "#
             + "else echo '❌ 出口 IP 和核对时不一致，已阻止启动 claude'; fi")
         #expect(NoPassAction().command(verifiedAddress: "1.2.3.4") == nil)
     }

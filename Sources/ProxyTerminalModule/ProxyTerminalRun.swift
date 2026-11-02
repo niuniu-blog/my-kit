@@ -10,15 +10,20 @@ public struct NoPassAction: ProxyPassAction {
     public func command(verifiedAddress: String) -> String? { nil }
 }
 
-/// 核对通过后启动 Claude Code。启动前在 shell 里再查一次出口 IP，不一致就不启动 ——
+/// 核对通过后倒计时 5 秒再启动 Claude Code（倒计时中按 Ctrl+C 整行取消，claude 不会启动）。
+/// 倒计时结束、启动前在 shell 里再查一次出口 IP，不一致就不启动 ——
 /// 防止 MyKit 核对完到 claude 启动之间代理断了或换了线路。
 /// 关掉 Claude Code 自己改终端标题，让分屏标题一直是文件夹名。
 public struct LaunchClaude: ProxyPassAction {
+    public static let countdownSeconds = 5
+
     public init() {}
 
     public func command(verifiedAddress: String) -> String? {
         let expected = PaneCommands.shellQuoted(verifiedAddress)
-        return "if [ \"$(curl -s --max-time 10 ip.sb)\" = \(expected) ]; then CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 claude; "
+        let seconds = (1...Self.countdownSeconds).reversed().map(String.init).joined(separator: " ")
+        return "for i in \(seconds); do printf '\\r✅ IP 核对通过，%s 秒后启动 claude（按 Ctrl+C 取消）' $i; sleep 1; done; echo; "
+            + "if [ \"$(curl -s --max-time 10 ip.sb)\" = \(expected) ]; then CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 claude; "
             + "else echo '❌ 出口 IP 和核对时不一致，已阻止启动 claude'; fi"
     }
 }
