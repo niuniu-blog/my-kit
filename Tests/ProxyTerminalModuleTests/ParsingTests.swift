@@ -94,6 +94,14 @@ import Testing
         #expect(titles == ["api", "my", "api (2)", "api (3)"])
         #expect(PaneLayout.titles(forFolders: ["/"]) == ["/"])
     }
+
+    @Test func aliasesReplaceFolderNames() {
+        let titles = PaneLayout.titles(
+            forFolders: ["/w/api", "/w/api", "/w/web", "/w/x"],
+            aliases: ["后端", "  ", "后端"]                // 空白 = 没起；比 folders 短也行
+        )
+        #expect(titles == ["后端", "api", "后端 (2)", "x"])
+    }
 }
 
 @Suite struct ITermScriptsTests {

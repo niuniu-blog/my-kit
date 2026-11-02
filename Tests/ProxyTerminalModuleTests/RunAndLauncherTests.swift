@@ -323,6 +323,57 @@ final class RecordingPassAction: ProxyPassAction {
         #expect(makeModel(defaults).current.folders == ["/c", "/a", "/b"])   // 立即保存
     }
 
+    @Test func dragMovesRowAndShiftsTheOthers() {
+        let defaults = makeDefaults()
+        let model = makeModel(defaults)
+        model.setFolder("/a", at: 0)
+        for path in ["/b", "/c", "/d"] {
+            model.addRow(); model.setFolder(path, at: model.current.folders.count - 1)
+        }
+        model.moveRow(from: 0, to: 3)
+        #expect(model.current.folders == ["/b", "/c", "/d", "/a"])
+        model.moveRow(from: 3, to: 1)
+        #expect(model.current.folders == ["/b", "/a", "/c", "/d"])
+        model.moveRow(from: 1, to: 9)                        // 超出范围不动
+        #expect(model.current.folders == ["/b", "/a", "/c", "/d"])
+        #expect(makeModel(defaults).current.folders == ["/b", "/a", "/c", "/d"])
+    }
+
+    @Test func aliasesFollowTheirRows() {
+        let defaults = makeDefaults()
+        let model = makeModel(defaults)
+        model.setFolder("/w/api", at: 0)
+        model.addRow(); model.setFolder("/w/web", at: 1)
+        model.addRow(); model.setFolder("/w/web", at: 2)
+        #expect(model.alias(at: 1) == "")
+        #expect(model.defaultName(at: 1) == "web")
+        model.setAlias("前端", at: 1)
+        model.setAlias("后端", at: 0)
+        #expect(model.paneTitles == ["后端", "前端", "web"])
+
+        model.moveRow(from: 0, to: 2)                         // 别名跟着行走
+        #expect(model.paneTitles == ["前端", "web", "后端"])
+        model.moveRow(at: 1, by: -1)
+        #expect(model.paneTitles == ["web", "前端", "后端"])
+        model.removeRow(at: 1)
+        #expect(model.paneTitles == ["web", "后端"])
+        model.addRow()
+        #expect(model.alias(at: 2) == "")
+        #expect(makeModel(defaults).paneTitles == ["web", "后端", "api"])   // 立即保存
+    }
+
+    @Test func presetsSavedBeforeAliasesStillLoad() throws {
+        let defaults = makeDefaults()
+        let id = UUID()
+        let old = #"[{"id":"\#(id.uuidString)","name":"旧","expectedIP":"1.2.3.4","folders":["/w/api","/w/web"]}]"#
+        defaults.set(Data(old.utf8), forKey: PresetStore.presetsKey)
+        let model = makeModel(defaults)
+        #expect(model.current.name == "旧")
+        #expect(model.paneTitles == ["api", "web"])
+        model.setAlias("A", at: 1)
+        #expect(model.current.aliases == ["", "A"])
+    }
+
     @Test func typedOrPastedPathExpandsTilde() {
         let model = makeModel(makeDefaults())
         model.setFolderText("~/work", at: 0)

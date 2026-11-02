@@ -79,7 +79,7 @@ public final class ProxyTerminalRun {
     }
 
     public func start(at now: Date = Date()) throws {
-        let titles = PaneLayout.titles(forFolders: preset.folders)
+        let titles = PaneLayout.titles(forFolders: preset.folders, aliases: preset.paddedAliases)
         let specs = zip(preset.folders, titles).map { folder, title in
             PaneSpec(title: title, lines: [commands.enterFolder(folder, title: title), commands.checkIP])
         }

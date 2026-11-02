@@ -65,11 +65,36 @@ public final class LauncherViewModel: ObservableObject {
         return text
     }
 
+    /// 第 index 块终端的别名（没起就是空字符串）
+    public func alias(at index: Int) -> String {
+        let aliases = current.paddedAliases
+        return aliases.indices.contains(index) ? aliases[index] : ""
+    }
+
+    public func setAlias(_ alias: String, at index: Int) {
+        updateCurrent { preset in
+            guard preset.aliases.indices.contains(index) else { return }
+            preset.aliases[index] = alias.trimmingCharacters(in: .newlines)
+        }
+    }
+
+    /// 没起别名时显示的名字（输入框里的灰字）
+    public func defaultName(at index: Int) -> String {
+        guard current.folders.indices.contains(index) else { return "" }
+        return PaneLayout.defaultName(forFolder: current.folders[index])
+    }
+
+    /// 每块终端在 iTerm2 里的标题，和打开时用的一样
+    public var paneTitles: [String] {
+        PaneLayout.titles(forFolders: current.folders, aliases: current.paddedAliases)
+    }
+
     /// 加一行，默认和最后一行同一个文件夹
     public func addRow() {
         updateCurrent { preset in
             guard preset.folders.count < PaneLayout.maxPanes else { return }
             preset.folders.append(preset.folders.last ?? home)
+            preset.aliases.append("")
         }
     }
 
@@ -77,15 +102,21 @@ public final class LauncherViewModel: ObservableObject {
         updateCurrent { preset in
             guard preset.folders.count > 1, preset.folders.indices.contains(index) else { return }
             preset.folders.remove(at: index)
+            preset.aliases.remove(at: index)
         }
     }
 
     /// 把第 index 行往上（offset = -1）或往下（offset = 1）挪一格
     public func moveRow(at index: Int, by offset: Int) {
+        moveRow(from: index, to: index + offset)
+    }
+
+    /// 把第 from 行挪到第 to 行的位置（拖动排序用），中间的行顺次让开
+    public func moveRow(from: Int, to: Int) {
         updateCurrent { preset in
-            let target = index + offset
-            guard preset.folders.indices.contains(index), preset.folders.indices.contains(target) else { return }
-            preset.folders.swapAt(index, target)
+            guard from != to, preset.folders.indices.contains(from), preset.folders.indices.contains(to) else { return }
+            preset.folders.insert(preset.folders.remove(at: from), at: to)
+            preset.aliases.insert(preset.aliases.remove(at: from), at: to)
         }
     }
 
@@ -151,6 +182,7 @@ public final class LauncherViewModel: ObservableObject {
 
     private func updateCurrent(_ change: (inout TerminalPreset) -> Void) {
         guard let index = presets.firstIndex(where: { $0.id == selectedID }) else { return }
+        presets[index].aliases = presets[index].paddedAliases   // 先对齐，增删挪行时两边一起动
         change(&presets[index])
         store.save(presets)
     }

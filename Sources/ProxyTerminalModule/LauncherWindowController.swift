@@ -30,7 +30,7 @@ final class LauncherWindowController: NSObject, NSWindowDelegate {
                 }
             )
             let window = EditableWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 680, height: 620),
+                contentRect: NSRect(x: 0, y: 0, width: 780, height: 620),
                 styleMask: [.titled, .closable, .resizable],
                 backing: .buffered,
                 defer: false
