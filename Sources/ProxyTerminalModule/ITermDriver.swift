@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 
 public enum TerminalError: Error, Equatable {
     /// 没装 iTerm2
@@ -45,6 +46,8 @@ public protocol TerminalDriving {
     /// 读窗口里每块的屏幕文字：sessionID → 文字。关掉的块不在结果里。
     func contents(windowID: Int) throws -> [String: String]
     func apply(_ updates: [PaneUpdate], windowID: Int) throws
+    /// 在刚打开的窗口里显示 iTerm2 的工具箱（右侧「会话状态」等）。尽力而为，失败不报错。
+    func showToolbelt()
 }
 
 /// 用 AppleScript 控制 iTerm2（与卸载器请访达删文件是同一套机制）。
@@ -73,6 +76,59 @@ public struct ITermDriver: TerminalDriving {
     public func apply(_ updates: [PaneUpdate], windowID: Int) throws {
         guard !updates.isEmpty else { return }
         _ = try run(ITermScripts.apply(updates, windowID: windowID))
+    }
+
+    /// iTerm2 菜单「工具箱 → 显示工具箱」的中文 / 英文标题
+    static let showToolbeltTitles: Set<String> = ["显示工具箱", "Show Toolbelt"]
+
+    /// iTerm2 没有显示工具箱的 AppleScript，只能通过辅助功能接口点它的菜单项（MyKit 本来就有辅助功能授权）。
+    /// 这个菜单项是"开 / 关"切换，且读不到勾选状态，所以先看最前面的窗口里有没有工具箱
+    /// （有工具箱的窗口直接带一个分栏视图 AXSplitGroup）—— 已经有了就不点，绝不会把它关掉。
+    /// 窗口刚建好时 iTerm2 可能还没到最前面、菜单项还不可点，每 0.2 秒再试，最多 10 次。
+    public func showToolbelt() {
+        Self.attemptShowToolbelt(remaining: 10)
+    }
+
+    private static func attemptShowToolbelt(remaining: Int) {
+        guard remaining > 0, AXIsProcessTrusted(),
+              let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
+        else { return }
+        let element = AXUIElementCreateApplication(app.processIdentifier)
+        guard app.isActive,
+              let window: AXUIElement = axAttribute(element, kAXFocusedWindowAttribute),
+              let menuBar: AXUIElement = axAttribute(element, kAXMenuBarAttribute),
+              let item = findMenuItem(in: menuBar, titles: showToolbeltTitles, depth: 0),
+              axAttribute(item, kAXEnabledAttribute) == true
+        else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                MainActor.assumeIsolated { attemptShowToolbelt(remaining: remaining - 1) }
+            }
+            return
+        }
+        let children: [AXUIElement] = axAttribute(window, kAXChildrenAttribute) ?? []
+        let hasToolbelt = children.contains { axAttribute($0, kAXRoleAttribute) == kAXSplitGroupRole as String }
+        if !hasToolbelt {
+            AXUIElementPerformAction(item, kAXPressAction as CFString)
+        }
+    }
+
+    private static func axAttribute<T>(_ element: AXUIElement, _ name: String) -> T? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
+        return value as? T
+    }
+
+    private static func findMenuItem(in element: AXUIElement, titles: Set<String>, depth: Int) -> AXUIElement? {
+        guard depth < 4 else { return nil }
+        for child in axAttribute(element, kAXChildrenAttribute) as [AXUIElement]? ?? [] {
+            if let title: String = axAttribute(child, kAXTitleAttribute), titles.contains(title) {
+                return child
+            }
+            if let found = findMenuItem(in: child, titles: titles, depth: depth + 1) {
+                return found
+            }
+        }
+        return nil
     }
 
     private func run(_ source: String) throws -> String {

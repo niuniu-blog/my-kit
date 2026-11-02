@@ -74,6 +74,7 @@ macOS 会弹窗"MyKit 想要控制 iTerm2"，点「好」即可。若用户点�
 ## 3. 技术方案
 
 - 2026-11-02 真机实测：iTerm2 3.7.6 切出的块会自动排成一样大（不需要再点「平均排列拆分窗格」）；oh-my-zsh 会在每条命令执行前把标题改成命令本身（出现过标题 `export`），所以第一行里关掉自动改标题并用 OSC 0 设标题，检查期间每 0.5 秒还会用 AppleScript 再设一次。
+- 工具箱（iTerm2 右侧的「会话状态」面板，用户 ToolbeltTools = Session Status）：新窗口默认不显示，也没有 AppleScript 能打开。开窗口后用辅助功能接口点菜单「工具箱 → 显示工具箱」；该菜单项是开关且读不到勾选状态，所以先看最前面的窗口有没有直属的 AXSplitGroup（工具箱的分栏视图，2026-11-02 真机确认），没有才点，避免把已显示的关掉。
 - 通过 AppleScript（`NSAppleScript`，与卸载器的 `FinderTrasher` 同一机制）控制 iTerm2：`create window with default profile`，对 session 用 `split vertically / horizontally with default profile` 切出网格，`write text` 输入命令，`set name` 改标题，`set background color` 染红。
 - 读取结果：轮询每个 session 的 `contents`（屏幕文本），每 0.5 秒一次，最多 15 秒。为了不把命令行本身误当结果，curl 之后再输出一个结束标记：
   `echo "MYKIT-END-$((a+b))"`（a+b = 每次随机的 6 位数）—— 命令行上显示的是算式，只有真正执行后屏幕上才出现算好的数字；只解析结束标记之前、命令行之后的那几行。

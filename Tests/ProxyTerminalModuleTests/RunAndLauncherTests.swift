@@ -24,6 +24,11 @@ final class FakeDriver: TerminalDriving {
     func apply(_ updates: [PaneUpdate], windowID: Int) throws {
         applied.append(updates)
     }
+
+    var toolbeltRequests = 0
+    func showToolbelt() {
+        toolbeltRequests += 1
+    }
 }
 
 final class RecordingPassAction: ProxyPassAction {
@@ -58,6 +63,7 @@ final class RecordingPassAction: ProxyPassAction {
         #expect(driver.opened.map(\.title) == ["api", "web", "api (2)"])
         #expect(driver.opened[0].lines == [commands.enterFolder("/w/api", title: "api"), commands.checkIP])
         #expect(driver.opened[2].lines[0] == commands.enterFolder("/x/api", title: "api (2)"))
+        #expect(driver.toolbeltRequests == 1)
     }
 
     @Test func passesMatchingPanesAndMarksOthers() throws {

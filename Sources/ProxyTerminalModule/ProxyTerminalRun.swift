@@ -80,6 +80,7 @@ public final class ProxyTerminalRun {
             Pane(folder: pair.0, title: pair.1, sessionID: sessionID, state: .waiting)
         }
         startedAt = now
+        driver.showToolbelt()
     }
 
     /// 读一遍各块的结果。返回 true 表示全部出结果了（之后不用再调）。
