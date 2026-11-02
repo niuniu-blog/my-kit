@@ -1,4 +1,5 @@
 import AppKit
+import Core
 import SwiftUI
 
 /// 「打开代理终端」小窗口。每次打开都从保存的设置重新读，关闭后什么都不留。
@@ -28,7 +29,7 @@ final class LauncherWindowController: NSObject, NSWindowDelegate {
                     self?.onOpen(preset)
                 }
             )
-            let window = NSWindow(
+            let window = EditableWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 520, height: 320),
                 styleMask: [.titled, .closable],
                 backing: .buffered,

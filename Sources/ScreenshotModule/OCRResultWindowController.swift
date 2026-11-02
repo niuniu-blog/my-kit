@@ -20,7 +20,7 @@ final class OCRResultWindowController {
 
     private func show() {
         if window == nil {
-            let window = NSWindow(
+            let window = EditableWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 480, height: 460),
                 styleMask: [.titled, .closable, .resizable],
                 backing: .buffered,

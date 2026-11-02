@@ -1,4 +1,5 @@
 import AppKit
+import Core
 import SwiftUI
 
 /// 卸载窗口。打开时才创建视图模型和图标缓存；关闭时全部释放，什么都不留在内存里。
@@ -20,7 +21,7 @@ final class UninstallerWindowController: NSObject, NSWindowDelegate {
             let model = UninstallerViewModel(dependencies: makeDependencies())
             let view = UninstallerView(
                 model: model, icons: AppIconStore(), home: FileManager.default.homeDirectoryForCurrentUser)
-            let window = NSWindow(
+            let window = EditableWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 860, height: 560),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable],
                 backing: .buffered,

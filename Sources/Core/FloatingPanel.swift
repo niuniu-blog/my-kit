@@ -88,19 +88,7 @@ public final class FloatingPanel: NSPanel {
 
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if keyHandler?(event) == true { return true }
-        // MyKit 没有主菜单，输入框里的 ⌘X / ⌘C / ⌘V / ⌘A 要自己转发
-        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-           let characters = event.charactersIgnoringModifiers {
-            let action: Selector?
-            switch characters {
-            case "x": action = #selector(NSText.cut(_:))
-            case "c": action = #selector(NSText.copy(_:))
-            case "v": action = #selector(NSText.paste(_:))
-            case "a": action = #selector(NSText.selectAll(_:))
-            default: action = nil
-            }
-            if let action, NSApp.sendAction(action, to: nil, from: self) { return true }
-        }
+        if EditShortcuts.perform(event, from: self) { return true }
         return super.performKeyEquivalent(with: event)
     }
 }
