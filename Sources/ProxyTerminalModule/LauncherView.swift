@@ -23,6 +23,7 @@ struct LauncherView: View {
             ipField
             Divider()
             folderRows
+            LayoutPreview(rows: PaneLayout.rows(count: model.current.folders.count))
             Button {
                 model.addRow()
             } label: {
@@ -104,9 +105,15 @@ struct LauncherView: View {
             ForEach(Array(model.current.folders.enumerated()), id: \.offset) { index, path in
                 FolderRow(
                     number: index + 1,
-                    path: model.displayPath(path),
+                    path: Binding(
+                        get: { model.displayPath(path) },
+                        set: { model.setFolderText($0, at: index) }
+                    ),
                     problem: model.folderProblem(at: index),
                     canRemove: model.canRemoveRow,
+                    canMoveUp: index > 0,
+                    canMoveDown: index < model.current.folders.count - 1,
+                    onMove: { model.moveRow(at: index, by: $0) },
                     onChoose: { chooseFolder(for: index, startingAt: path) },
                     onRemove: { model.removeRow(at: index) },
                     onDrop: { model.setFolder($0, at: index) }
@@ -128,11 +135,43 @@ struct LauncherView: View {
     }
 }
 
+/// iTerm2 窗口里的排法示意：格子里的数字就是上面列表的行号
+private struct LayoutPreview: View {
+    let rows: [Int]
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("窗口里的排法：")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            VStack(spacing: 2) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { row, count in
+                    let head = rows[..<row].reduce(0, +)
+                    HStack(spacing: 2) {
+                        ForEach(0..<count, id: \.self) { column in
+                            Text("\(head + column + 1)")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, minHeight: 16)
+                                .background(RoundedRectangle(cornerRadius: 3).stroke(Color.secondary.opacity(0.5)))
+                        }
+                    }
+                }
+            }
+            .frame(width: 120)
+        }
+        .padding(.leading, 6)
+    }
+}
+
 private struct FolderRow: View {
     let number: Int
-    let path: String
+    @Binding var path: String
     let problem: String?
     let canRemove: Bool
+    let canMoveUp: Bool
+    let canMoveDown: Bool
+    let onMove: (Int) -> Void
     let onChoose: () -> Void
     let onRemove: () -> Void
     let onDrop: (String) -> Void
@@ -146,15 +185,22 @@ private struct FolderRow: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 16, alignment: .trailing)
             VStack(alignment: .leading, spacing: 2) {
-                Text(path)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                TextField("文件夹路径，例如 ~/work/tools", text: $path)
+                    .textFieldStyle(.roundedBorder)
                 if let problem {
                     Text(problem).font(.caption).foregroundStyle(.red)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Button("选文件夹…", action: onChoose)
+            HStack(spacing: 2) {
+                Button { onMove(-1) } label: { Image(systemName: "chevron.up") }
+                    .disabled(!canMoveUp)
+                    .help("往前挪（窗口里往左 / 往上）")
+                Button { onMove(1) } label: { Image(systemName: "chevron.down") }
+                    .disabled(!canMoveDown)
+                    .help("往后挪（窗口里往右 / 往下）")
+            }
             Button(action: onRemove) {
                 Image(systemName: "minus")
             }

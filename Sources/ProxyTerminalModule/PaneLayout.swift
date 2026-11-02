@@ -4,13 +4,14 @@ import Foundation
 public enum PaneLayout {
     public static let maxPanes = 9
 
-    /// 每行几块：每行最多 2 块，从上往下排，块数是单数时最后一行只有 1 块。
-    /// 1 → [1]，2 → [2]，3 → [2, 1]，4 → [2, 2]，5 → [2, 2, 1]
+    public static let maxPerRow = 3
+
+    /// 每行几块：从左往右、从上往下排，每行排满 3 块再换下一行，最后一行放剩下的。
+    /// 列表里的顺序就是这个顺序。1 → [1]，3 → [3]，4 → [3, 1]，5 → [3, 2]，9 → [3, 3, 3]
     public static func rows(count: Int) -> [Int] {
         guard count > 0 else { return [] }
-        if count == 1 { return [1] }
-        var rows = Array(repeating: 2, count: count / 2)
-        if count % 2 == 1 { rows.append(1) }
+        var rows = Array(repeating: maxPerRow, count: count / maxPerRow)
+        if count % maxPerRow > 0 { rows.append(count % maxPerRow) }
         return rows
     }
 

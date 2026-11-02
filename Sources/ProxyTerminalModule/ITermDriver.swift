@@ -187,17 +187,18 @@ enum ITermScripts {
             "set w to (create window with default profile)",
             "set p0 to current session of w",
         ]
-        // 先上下切出各行（iTerm2 会自动把切出来的块排成一样大），再把有两块的行左右切开
-        func splitRows(_ range: Range<Int>) {
-            guard range.count > 1 else { return }
-            let mid = range.lowerBound + (range.count + 1) / 2
-            lines.append("tell p\(heads[range.lowerBound]) to set p\(heads[mid]) to (split horizontally with default profile)")
-            splitRows(range.lowerBound..<mid)
-            splitRows(mid..<range.upperBound)
+        // 先上下切出各行，再把每行左右切开（iTerm2 会自动把同一层切出来的块排成一样大）。
+        // 对半递归地切：被切的块留在上/左，新块在下/右，所以序号从上到下、从左到右递增。
+        func split(_ ids: [Int], _ direction: String) {
+            guard ids.count > 1 else { return }
+            let mid = (ids.count + 1) / 2
+            lines.append("tell p\(ids[0]) to set p\(ids[mid]) to (split \(direction) with default profile)")
+            split(Array(ids[..<mid]), direction)
+            split(Array(ids[mid...]), direction)
         }
-        splitRows(0..<rows.count)
-        for (row, count) in rows.enumerated() where count == 2 {
-            lines.append("tell p\(heads[row]) to set p\(heads[row] + 1) to (split vertically with default profile)")
+        split(heads, "horizontally")
+        for (row, count) in rows.enumerated() {
+            split(Array(heads[row]..<(heads[row] + count)), "vertically")
         }
         for (index, pane) in panes.enumerated() {
             lines.append("tell p\(index)")

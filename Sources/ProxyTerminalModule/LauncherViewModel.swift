@@ -53,6 +53,18 @@ public final class LauncherViewModel: ObservableObject {
         }
     }
 
+    /// 在输入框里直接打/粘贴的路径：开头的 ~ 换成主目录，去掉粘贴带进来的换行
+    public func setFolderText(_ text: String, at index: Int) {
+        setFolder(expandPath(text.trimmingCharacters(in: .newlines)), at: index)
+    }
+
+    /// 「~」「~/xxx」展开成主目录下的完整路径，其他原样返回
+    public func expandPath(_ text: String) -> String {
+        if text == "~" { return home }
+        if text.hasPrefix("~/") { return home + text.dropFirst(1) }
+        return text
+    }
+
     /// 加一行，默认和最后一行同一个文件夹
     public func addRow() {
         updateCurrent { preset in
@@ -65,6 +77,15 @@ public final class LauncherViewModel: ObservableObject {
         updateCurrent { preset in
             guard preset.folders.count > 1, preset.folders.indices.contains(index) else { return }
             preset.folders.remove(at: index)
+        }
+    }
+
+    /// 把第 index 行往上（offset = -1）或往下（offset = 1）挪一格
+    public func moveRow(at index: Int, by offset: Int) {
+        updateCurrent { preset in
+            let target = index + offset
+            guard preset.folders.indices.contains(index), preset.folders.indices.contains(target) else { return }
+            preset.folders.swapAt(index, target)
         }
     }
 
@@ -113,6 +134,7 @@ public final class LauncherViewModel: ObservableObject {
     /// 某一行文件夹的问题；没问题时为 nil
     public func folderProblem(at index: Int) -> String? {
         guard current.folders.indices.contains(index) else { return nil }
+        if current.folders[index].trimmingCharacters(in: .whitespaces).isEmpty { return "请填文件夹路径" }
         return folderExists(current.folders[index]) ? nil : "文件夹不存在"
     }
 

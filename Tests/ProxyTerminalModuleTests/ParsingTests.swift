@@ -75,13 +75,15 @@ import Testing
 }
 
 @Suite struct PaneLayoutTests {
-    @Test func rowsHoldAtMostTwo() {
+    @Test func rowsFillThreeAcrossThenWrap() {
         #expect(PaneLayout.rows(count: 0) == [])
         #expect(PaneLayout.rows(count: 1) == [1])
         #expect(PaneLayout.rows(count: 2) == [2])
-        #expect(PaneLayout.rows(count: 3) == [2, 1])
-        #expect(PaneLayout.rows(count: 4) == [2, 2])
-        #expect(PaneLayout.rows(count: 9) == [2, 2, 2, 2, 1])
+        #expect(PaneLayout.rows(count: 3) == [3])
+        #expect(PaneLayout.rows(count: 4) == [3, 1])
+        #expect(PaneLayout.rows(count: 5) == [3, 2])
+        #expect(PaneLayout.rows(count: 7) == [3, 3, 1])
+        #expect(PaneLayout.rows(count: 9) == [3, 3, 3])
         for count in 1...9 {
             #expect(PaneLayout.rows(count: count).reduce(0, +) == count)
         }
@@ -113,12 +115,22 @@ import Testing
         }
     }
 
-    @Test func fourPanesMakeTwoByTwo() {
-        let panes = (0..<4).map { PaneSpec(title: "t\($0)", lines: []) }
+    @Test func fivePanesMakeThreeOverTwo() {
+        let panes = (0..<5).map { PaneSpec(title: "t\($0)", lines: []) }
         let script = ITermScripts.open(panes: panes)
-        #expect(script.contains("tell p0 to set p2 to (split horizontally"))
+        #expect(script.contains("tell p0 to set p3 to (split horizontally"))   // 第二行从第 4 块开始
+        #expect(script.contains("tell p0 to set p2 to (split vertically"))     // 第一行：1 | 2 | 3
         #expect(script.contains("tell p0 to set p1 to (split vertically"))
-        #expect(script.contains("tell p2 to set p3 to (split vertically"))
+        #expect(script.contains("tell p3 to set p4 to (split vertically"))     // 第二行：4 | 5
+    }
+
+    @Test func ninePanesMakeThreeByThree() {
+        let panes = (0..<9).map { PaneSpec(title: "t\($0)", lines: []) }
+        let script = ITermScripts.open(panes: panes)
+        #expect(script.contains("tell p0 to set p6 to (split horizontally"))
+        #expect(script.contains("tell p0 to set p3 to (split horizontally"))
+        #expect(script.contains("tell p6 to set p8 to (split vertically"))
+        #expect(script.contains("tell p6 to set p7 to (split vertically"))
     }
 
     @Test func parsesContentsRecords() {

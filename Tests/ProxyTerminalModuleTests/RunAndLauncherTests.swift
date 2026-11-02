@@ -306,4 +306,37 @@ final class RecordingPassAction: ProxyPassAction {
         #expect(model.displayPath("/Users/me/work") == "~/work")
         #expect(model.displayPath("/Users/meow") == "/Users/meow")
     }
+
+    @Test func rowsCanBeMovedUpAndDown() {
+        let defaults = makeDefaults()
+        let model = makeModel(defaults)
+        model.setFolder("/a", at: 0)
+        model.addRow(); model.setFolder("/b", at: 1)
+        model.addRow(); model.setFolder("/c", at: 2)
+        model.moveRow(at: 2, by: -1)
+        #expect(model.current.folders == ["/a", "/c", "/b"])
+        model.moveRow(at: 0, by: 1)
+        #expect(model.current.folders == ["/c", "/a", "/b"])
+        model.moveRow(at: 0, by: -1)                         // 已在最上面，不动
+        model.moveRow(at: 2, by: 1)                          // 已在最下面，不动
+        #expect(model.current.folders == ["/c", "/a", "/b"])
+        #expect(makeModel(defaults).current.folders == ["/c", "/a", "/b"])   // 立即保存
+    }
+
+    @Test func typedOrPastedPathExpandsTilde() {
+        let model = makeModel(makeDefaults())
+        model.setFolderText("~/work", at: 0)
+        #expect(model.current.folders == ["/Users/me/work"])
+        #expect(model.displayPath(model.current.folders[0]) == "~/work")
+        model.setFolderText("~", at: 0)
+        #expect(model.current.folders == ["/Users/me"])
+        model.setFolderText("/w/api\n", at: 0)
+        #expect(model.current.folders == ["/w/api"])
+        #expect(model.folderProblem(at: 0) == nil)
+        model.setFolderText("~other/x", at: 0)
+        #expect(model.current.folders == ["~other/x"])
+        model.setFolderText("", at: 0)
+        #expect(model.folderProblem(at: 0) == "请填文件夹路径")
+        #expect(!model.canOpen)
+    }
 }
