@@ -130,7 +130,10 @@ import Testing
         let script = ITermScripts.apply([
             PaneUpdate(sessionID: "A", title: "my ✅ 1.2.3.4", markFailed: false),
             PaneUpdate(sessionID: "B", title: "api ❌ 超时", markFailed: true),
+            PaneUpdate(sessionID: "C", title: "web ✅ 1.2.3.4", markFailed: false, typeText: "claude"),
         ], windowID: 7)
+        #expect(script.components(separatedBy: "write text").count == 2)
+        #expect(script.contains(#"if sid is "C" then\#nset name of s to "web ✅ 1.2.3.4"\#ntell s to write text "claude""#))
         #expect(script.contains("window id 7"))
         #expect(script.components(separatedBy: "set background color").count == 2)
         #expect(script.contains(#"if sid is "B" then"#))

@@ -21,6 +21,15 @@ public struct PaneUpdate: Equatable {
     public let title: String
     /// 把背景染红
     public let markFailed: Bool
+    /// 改完标题后往这块里输入的命令（只有核对通过的块才有）
+    public let typeText: String?
+
+    public init(sessionID: String, title: String, markFailed: Bool, typeText: String? = nil) {
+        self.sessionID = sessionID
+        self.title = title
+        self.markFailed = markFailed
+        self.typeText = typeText
+    }
 }
 
 /// 一块终端的打开参数
@@ -151,7 +160,7 @@ enum ITermScripts {
         return result
     }
 
-    /// 改标题；标记失败的把背景往红色调 40%（深色、浅色主题都能看出来）
+    /// 改标题；标记失败的把背景往红色调 40%（深色、浅色主题都能看出来）；需要时输入下一步的命令
     static func apply(_ updates: [PaneUpdate], windowID: Int) -> String {
         var lines = [
             "tell application id \"\(ITermDriver.bundleID)\"",
@@ -165,6 +174,9 @@ enum ITermScripts {
             if update.markFailed {
                 lines.append("set c to background color of s")
                 lines.append("set background color of s to {((item 1 of c) * 0.6 + 26214) as integer, ((item 2 of c) * 0.6) as integer, ((item 3 of c) * 0.6) as integer}")
+            }
+            if let text = update.typeText {
+                lines.append("tell s to write text \(quoted(text))")
             }
             lines.append("end if")
         }

@@ -1,14 +1,26 @@
 import Foundation
 
-/// 某块终端 IP 校验通过之后要做的事。用户还没定，第一期是空的；定了以后只换这里。
-@MainActor
+/// 某块终端 IP 核对通过之后，往那块里输入的命令。只有核对通过的块才会被问到；返回 nil 表示什么都不做。
 public protocol ProxyPassAction {
-    func run(sessionID: String, folder: String, title: String)
+    func command(verifiedAddress: String) -> String?
 }
 
 public struct NoPassAction: ProxyPassAction {
-    nonisolated public init() {}
-    public func run(sessionID: String, folder: String, title: String) {}
+    public init() {}
+    public func command(verifiedAddress: String) -> String? { nil }
+}
+
+/// 核对通过后启动 Claude Code。启动前在 shell 里再查一次出口 IP，不一致就不启动 ——
+/// 防止 MyKit 核对完到 claude 启动之间代理断了或换了线路。
+/// 关掉 Claude Code 自己改终端标题，让分屏标题一直是文件夹名。
+public struct LaunchClaude: ProxyPassAction {
+    public init() {}
+
+    public func command(verifiedAddress: String) -> String? {
+        let expected = PaneCommands.shellQuoted(verifiedAddress)
+        return "if [ \"$(curl -s --max-time 10 ip.sb)\" = \(expected) ]; then CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 claude; "
+            + "else echo '❌ 出口 IP 和核对时不一致，已阻止启动 claude'; fi"
+    }
 }
 
 public enum PaneState: Equatable {
@@ -98,16 +110,15 @@ public final class ProxyTerminalRun {
             }
             // 还在等的也重设一次标题：shell 刚启动时会把标题改成路径
             let state = panes[index].state
+            // 只有核对通过（.passed 只在 IP 与预期一致时才会出现）的块才输入下一步的命令；其余一律不输入
+            var typeText: String?
+            if case .passed(let address) = state {
+                typeText = passAction.command(verifiedAddress: address)
+            }
             updates.append(PaneUpdate(sessionID: pane.sessionID, title: Self.title(pane.title, state),
-                                      markFailed: state.isFinished && !Self.isPassed(state)))
+                                      markFailed: state.isFinished && !Self.isPassed(state), typeText: typeText))
         }
         try? driver.apply(updates, windowID: windowID)
-
-        for pane in panes where updates.contains(where: { $0.sessionID == pane.sessionID }) {
-            if case .passed = pane.state {
-                passAction.run(sessionID: pane.sessionID, folder: pane.folder, title: pane.title)
-            }
-        }
         return panes.allSatisfy { $0.state.isFinished } ? finish() : false
     }
 

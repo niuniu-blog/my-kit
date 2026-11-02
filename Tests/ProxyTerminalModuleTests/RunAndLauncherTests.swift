@@ -26,11 +26,11 @@ final class FakeDriver: TerminalDriving {
     }
 }
 
-@MainActor
 final class RecordingPassAction: ProxyPassAction {
-    var ran: [String] = []
-    func run(sessionID: String, folder: String, title: String) {
-        ran.append(title)
+    var asked: [String] = []
+    func command(verifiedAddress: String) -> String? {
+        asked.append(verifiedAddress)
+        return "next \(verifiedAddress)"
     }
 }
 
@@ -43,9 +43,10 @@ final class RecordingPassAction: ProxyPassAction {
         "\(commands.checkIP)\n\(result)\n\n\(commands.marker)\n"
     }
 
-    func makeRun(folders: [String], driver: FakeDriver, action: RecordingPassAction? = nil) throws -> ProxyTerminalRun {
+    func makeRun(folders: [String], driver: FakeDriver, action: RecordingPassAction? = nil,
+                 expectedIP: String = "1.2.3.4") throws -> ProxyTerminalRun {
         let action = action ?? RecordingPassAction()
-        let preset = TerminalPreset(name: "工作", expectedIP: "1.2.3.4", folders: folders)
+        let preset = TerminalPreset(name: "工作", expectedIP: expectedIP, folders: folders)
         let run = ProxyTerminalRun(preset: preset, driver: driver, passAction: action, commands: commands)
         try run.start(at: start)
         return run
@@ -67,9 +68,9 @@ final class RecordingPassAction: ProxyPassAction {
         driver.screens = ["S0": finished("1.2.3.4"), "S1": finished("5.6.7.8"), "S2": commands.checkIP]
         #expect(run.poll(at: start.addingTimeInterval(2)) == false)
         #expect(run.panes.map(\.state) == [.passed("1.2.3.4"), .wrongAddress("5.6.7.8"), .waiting])
-        #expect(action.ran == ["api"])
+        #expect(action.asked == ["1.2.3.4"])
         #expect(driver.applied.last == [
-            PaneUpdate(sessionID: "S0", title: "api ✅ 1.2.3.4", markFailed: false),
+            PaneUpdate(sessionID: "S0", title: "api ✅ 1.2.3.4", markFailed: false, typeText: "next 1.2.3.4"),
             PaneUpdate(sessionID: "S1", title: "web ❌ 5.6.7.8", markFailed: true),
             PaneUpdate(sessionID: "S2", title: "db", markFailed: false),
         ])
@@ -78,8 +79,41 @@ final class RecordingPassAction: ProxyPassAction {
         #expect(run.poll(at: start.addingTimeInterval(16)) == true)
         #expect(run.panes[2].state == .timedOut)
         #expect(driver.applied.last == [PaneUpdate(sessionID: "S2", title: "db ❌ 超时", markFailed: true)])
-        #expect(action.ran == ["api"])
+        #expect(action.asked == ["1.2.3.4"])
         #expect(run.summary == "3 个终端：1 个 IP 正确，web 不对（实际 5.6.7.8）、db 超时")
+    }
+
+    /// 核对失败的任何情况都绝不能输入下一步的命令
+    @Test func failedPanesNeverGetTheNextCommand() throws {
+        let driver = FakeDriver()
+        let action = RecordingPassAction()
+        let run = try makeRun(folders: ["/a", "/b", "/c", "/d", "/e"], driver: driver, action: action)
+        driver.screens = [
+            "S0": finished("1.2.3.40"),                         // 只差一位
+            "S1": finished("2001:db8::1"),
+            "S2": finished(""),                                  // curl 什么都没拿到
+            "S3": commands.checkIP,                              // 一直没执行完
+            // S4 那块被关掉了
+        ]
+        #expect(run.poll(at: start.addingTimeInterval(20)) == true)
+        #expect(run.panes.map(\.state) == [.wrongAddress("1.2.3.40"), .wrongAddress("2001:db8::1"), .noAddress, .timedOut, .closed])
+        #expect(action.asked.isEmpty)
+        #expect(driver.applied.flatMap { $0 }.allSatisfy { $0.typeText == nil })
+
+        // 预期 IP 没填（不该出现，小窗口会拦住）时也不能算通过
+        let driver2 = FakeDriver()
+        let run2 = try makeRun(folders: ["/a"], driver: driver2, action: action, expectedIP: "")
+        driver2.screens = ["S0": finished("1.2.3.4")]
+        #expect(run2.poll(at: start) == true)
+        #expect(run2.panes[0].state == .wrongAddress("1.2.3.4"))
+        #expect(action.asked.isEmpty)
+    }
+
+    @Test func launchClaudeRechecksAddressInShell() {
+        let command = LaunchClaude().command(verifiedAddress: "1.2.3.4")
+        #expect(command == #"if [ "$(curl -s --max-time 10 ip.sb)" = '1.2.3.4' ]; then CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 claude; "#
+            + "else echo '❌ 出口 IP 和核对时不一致，已阻止启动 claude'; fi")
+        #expect(NoPassAction().command(verifiedAddress: "1.2.3.4") == nil)
     }
 
     @Test func allCorrectSummary() throws {

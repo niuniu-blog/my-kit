@@ -2,7 +2,8 @@ import AppKit
 import Core
 
 /// 代理终端：右上角菜单里的「打开代理终端…」。让 iTerm2 开一个分屏窗口，每块进入各自的文件夹、
-/// 执行 proxy 和 curl ip.sb，再和预期 IP 比对。平时零开销，只在检查期间每 0.5 秒读一次屏幕。
+/// 执行 proxy 和 curl ip.sb，再和预期 IP 比对；
+/// 一致的块启动 Claude Code，不一致的标红、什么都不执行。平时零开销，只在检查期间每 0.5 秒读一次屏幕。
 @MainActor
 public final class ProxyTerminalModule: NSObject, AppModule {
     public let id = "proxyTerminal"
@@ -20,7 +21,7 @@ public final class ProxyTerminalModule: NSObject, AppModule {
     public init(
         makeDriver: @escaping () -> TerminalDriving = { ITermDriver() },
         makeStore: @escaping () -> PresetStore = { PresetStore() },
-        passAction: ProxyPassAction = NoPassAction()
+        passAction: ProxyPassAction = LaunchClaude()
     ) {
         self.makeDriver = makeDriver
         self.passAction = passAction
