@@ -23,7 +23,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>卸载软件时，需要管理员权限的文件要请访达来移到废纸篓。</string>
+	<string>卸载软件时，需要管理员权限的文件要请访达来移到废纸篓；打开代理终端时，要让 iTerm2 开分屏窗口并执行命令。</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 </dict>

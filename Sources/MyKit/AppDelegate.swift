@@ -1,6 +1,7 @@
 import AppKit
 import ClipboardModule
 import Core
+import ProxyTerminalModule
 import ScreenshotModule
 import SystemMonitorModule
 import UninstallerModule
@@ -19,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var screenshot: ScreenshotModule?
     private var monitor: SystemMonitorModule?
     private var uninstaller: UninstallerModule?
+    private var proxyTerminal: ProxyTerminalModule?
     private var statusBar: StatusBarController?
     private var settingsWindow: SettingsWindowController?
     private var eventTapFailed = false
@@ -49,6 +51,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let uninstaller = UninstallerModule()
         registry.register(uninstaller)
         self.uninstaller = uninstaller
+
+        // 代理终端：同样只有一个菜单项，只在检查 IP 期间工作
+        let proxyTerminal = ProxyTerminalModule()
+        registry.register(proxyTerminal)
+        self.proxyTerminal = proxyTerminal
 
         registry.startAll()
         for failure in registry.failures {

@@ -14,15 +14,17 @@ let package = Package(
         .target(name: "ScreenshotModule", dependencies: ["Core"]),
         .target(name: "SystemMonitorModule", dependencies: ["Core"]),
         .target(name: "UninstallerModule", dependencies: ["Core"]),
+        .target(name: "ProxyTerminalModule", dependencies: ["Core"]),
         .executableTarget(
             name: "MyKit",
-            dependencies: ["Core", "ClipboardModule", "ScreenshotModule", "SystemMonitorModule", "UninstallerModule"]
+            dependencies: ["Core", "ClipboardModule", "ScreenshotModule", "SystemMonitorModule", "UninstallerModule", "ProxyTerminalModule"]
         ),
         .testTarget(name: "CoreTests", dependencies: ["Core"]),
         .testTarget(name: "ClipboardModuleTests", dependencies: ["ClipboardModule"]),
         .testTarget(name: "ScreenshotModuleTests", dependencies: ["ScreenshotModule"]),
         .testTarget(name: "SystemMonitorModuleTests", dependencies: ["SystemMonitorModule"]),
         .testTarget(name: "UninstallerModuleTests", dependencies: ["UninstallerModule"]),
+        .testTarget(name: "ProxyTerminalModuleTests", dependencies: ["ProxyTerminalModule"]),
     ],
     swiftLanguageModes: [.v5]
 )
